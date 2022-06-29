@@ -35,7 +35,7 @@ class Game:
           self.winner = self.board.place(x)
           self.move += 1
       else:
-        x = self.ai.compute(self.board)
+        x = self.ai.predict(self.board)
         self.winner = self.board.place(x)
         self.move += 1
     else:
@@ -66,7 +66,7 @@ class Game:
           color = (0, 0, 255)
         gfxdraw.aacircle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
         gfxdraw.filled_circle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
-    if self.move % 2 == 1:
+    if self.winner == 0 and self.move % 2 == 1:
       color = (255, 0, 0)
       gfxdraw.aatrigon(self.canvas, self.arrow_x - 30, 30, self.arrow_x + 30, 30, self.arrow_x, 70, color)
       gfxdraw.filled_trigon(self.canvas, self.arrow_x - 29, 31, self.arrow_x + 29, 31, self.arrow_x, 69, color)
