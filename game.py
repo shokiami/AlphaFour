@@ -1,3 +1,4 @@
+from ai import AI
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
@@ -14,6 +15,7 @@ class Game:
     self.move = 1
     self.winner = 0
     self.arrow_x = 350
+    self.ai = AI()
   
   def four_in_a_row(self, x0, y0, dx, dy):
     in_a_row = 1
@@ -44,13 +46,6 @@ class Game:
     elif self.move == 42:
       self.winner = 3
 
-  def compute(self):
-    x = np.random.randint(7)
-    while not self.placeable(x):
-      x = np.random.randint(7)
-    pygame.time.wait(1000)
-    return x
-
   def update(self):
     events = {"click": False, "quit": False, "r": False}
     for event in pygame.event.get():
@@ -68,7 +63,7 @@ class Game:
         if events["click"] and self.placeable(x):
           self.place(x)
       else:
-        x = self.compute()
+        x = self.ai.compute(self.board)
         self.place(x)
     else:
       if self.winner == 1:
