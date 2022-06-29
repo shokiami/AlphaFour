@@ -1,9 +1,9 @@
 from ai import AI
+from board import Board
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
 from pygame import gfxdraw
-import numpy as np
 
 class Game:
   def __init__(self):
@@ -11,40 +11,11 @@ class Game:
     pygame.display.set_caption("Connect 4")
     self.canvas = pygame.display.set_mode((700, 700))
     self.running = True
-    self.board = np.zeros((6, 7))
+    self.board = Board()
     self.move = 1
     self.winner = 0
     self.arrow_x = 350
     self.ai = AI()
-  
-  def four_in_a_row(self, x0, y0, dx, dy):
-    in_a_row = 1
-    for sgn in (-1, 1):
-      x = x0 + sgn * dx
-      y = y0 + sgn * dy
-      while x > -1 and x < 7 and y > -1 and y < 6:
-        if self.board[y, x] != self.board[y0, x0]:
-          break
-        in_a_row += 1
-        x += sgn * dx
-        y += sgn * dy
-    return in_a_row >= 4
-  
-  def placeable(self, x):
-    return self.board[0][x] == 0
-
-  def place(self, x):
-    y = 0
-    while y < 6 and self.board[y, x] == 0:
-      y += 1
-    y -= 1
-    player = 2 - self.move % 2
-    self.board[y, x] = player
-    self.move += 1
-    if self.four_in_a_row(x, y, 1, 0) or self.four_in_a_row(x, y, 1, 1) or self.four_in_a_row(x, y, 0, 1) or self.four_in_a_row(x, y, 1, -1):
-      self.winner = player
-    elif self.move == 42:
-      self.winner = 3
 
   def update(self):
     events = {"click": False, "quit": False, "r": False}
@@ -60,11 +31,13 @@ class Game:
       if self.move % 2 == 1:
         x = int(pygame.mouse.get_pos()[0] / 100)
         self.arrow_x = int(0.2 * (100 * x + 50) + 0.8 * self.arrow_x)
-        if events["click"] and self.placeable(x):
-          self.place(x)
+        if events["click"] and self.board.placeable(x):
+          self.winner = self.board.place(x)
+          self.move += 1
       else:
         x = self.ai.compute(self.board)
-        self.place(x)
+        self.winner = self.board.place(x)
+        self.move += 1
     else:
       if self.winner == 1:
         print("Red wins!")
@@ -74,7 +47,7 @@ class Game:
         print("Draw game!")
       self.winner = -1  # pause game
     if events["r"]:
-      self.board = np.zeros((6, 7))
+      self.board = Board()
       self.move = 1
       self.winner = 0
       self.arrow_x = 350
@@ -87,9 +60,9 @@ class Game:
     for x in range(7):
       for y in range(6):
         color = (255, 255, 255)
-        if self.board[y, x] == 1:
+        if self.board.mat[y, x] == 1:
           color = (255, 0, 0)
-        if self.board[y, x] == 2:
+        if self.board.mat[y, x] == 2:
           color = (0, 0, 255)
         gfxdraw.aacircle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
         gfxdraw.filled_circle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
