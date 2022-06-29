@@ -5,6 +5,11 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
 from pygame import gfxdraw
 
+WHITE = (255, 255, 255)
+YELLOW = (255, 235, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+
 class Game:
   def __init__(self):
     pygame.init()
@@ -18,7 +23,7 @@ class Game:
     self.ai = AI()
 
   def update(self):
-    events = {"click": False, "quit": False, "r": False}
+    events = {"click": False, "quit": False, "r": False, "q": False}
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
           events["quit"] = True
@@ -27,6 +32,8 @@ class Game:
         if event.type == pygame.KEYDOWN:
           if event.key == pygame.K_r:
             events["r"] = True
+          if event.key == pygame.K_q:
+            events["q"] = True
     if self.winner == 0:
       if self.move % 2 == 1:
         x = int(pygame.mouse.get_pos()[0] / 100)
@@ -51,23 +58,22 @@ class Game:
       self.move = 1
       self.winner = 0
       self.arrow_x = 350
-    if events["quit"]:
+    if events["quit"] or events["q"]:
       self.running = False
 
   def render(self):
-    self.canvas.fill((255, 255, 255))
-    gfxdraw.box(self.canvas, (0, 100, 700, 700), (255, 255, 0))
+    self.canvas.fill(WHITE)
+    gfxdraw.box(self.canvas, (0, 100, 700, 700), YELLOW)
     for x in range(7):
       for y in range(6):
-        color = (255, 255, 255)
+        color = WHITE
         if self.board.mat[y, x] == 1:
-          color = (255, 0, 0)
+          color = RED
         if self.board.mat[y, x] == 2:
-          color = (0, 0, 255)
+          color = BLUE
         gfxdraw.aacircle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
         gfxdraw.filled_circle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
     if self.winner == 0 and self.move % 2 == 1:
-      color = (255, 0, 0)
-      gfxdraw.aatrigon(self.canvas, self.arrow_x - 30, 30, self.arrow_x + 30, 30, self.arrow_x, 70, color)
-      gfxdraw.filled_trigon(self.canvas, self.arrow_x - 29, 31, self.arrow_x + 29, 31, self.arrow_x, 69, color)
+      gfxdraw.aatrigon(self.canvas, self.arrow_x - 30, 30, self.arrow_x + 30, 30, self.arrow_x, 70, RED)
+      gfxdraw.filled_trigon(self.canvas, self.arrow_x - 29, 31, self.arrow_x + 29, 31, self.arrow_x, 69, RED)
     pygame.display.update()
