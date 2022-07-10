@@ -3,6 +3,7 @@ from board import Board
 import torch
 from torch import nn
 from torch import optim
+import numpy as np
 
 class ConvBlock(nn.Module):
   def __init__(self):
@@ -96,15 +97,23 @@ class AI:
     return best_x
   
   def train(self):
-    optimizer = optim.Adam(self.model.parameters(), lr=0.01)
+    n = 0
+    epsilon = 0.5
+    lr = 0.01
+    optimizer = optim.Adam(self.model.parameters(), lr=lr)
     criterion = nn.MSELoss()
-    for i in range(100):
+    for i in range(n):
       board = Board()
       winner = 0
       history = {"player 1": [], "player 2": []}
       while winner == 0:
         player = board.player
-        x = self.predict(board, 1)[0]
+        if np.random.rand() > epsilon:
+          x = self.predict(board, 1)[0]
+        else:
+          x = np.random.randint(7)
+          while not board.placeable(x):
+            x = np.random.randint(7)
         winner = board.place(x)
         history[f"player {player}"].append(board.mat.copy())
       for player in [1, 2]:
