@@ -17,7 +17,6 @@ class Game:
     self.canvas = pygame.display.set_mode((700, 700))
     self.running = True
     self.board = Board()
-    self.move = 1
     self.winner = 0
     self.arrow_x = 350
     self.ai = AI()
@@ -35,16 +34,14 @@ class Game:
           if event.key == pygame.K_q:
             events["q"] = True
     if self.winner == 0:
-      if self.move % 2 == 1:
+      if self.board.player == 1:
         x = int(pygame.mouse.get_pos()[0] / 100)
         self.arrow_x = int(0.2 * (100 * x + 50) + 0.8 * self.arrow_x)
         if events["click"] and self.board.placeable(x):
           self.winner = self.board.place(x)
-          self.move += 1
       else:
         x = self.ai.predict(self.board)
         self.winner = self.board.place(x)
-        self.move += 1
     else:
       if self.winner == 1:
         print("Red wins!")
@@ -55,7 +52,6 @@ class Game:
       self.winner = -1  # pause game
     if events["r"]:
       self.board = Board()
-      self.move = 1
       self.winner = 0
       self.arrow_x = 350
     if events["quit"] or events["q"]:
@@ -73,7 +69,7 @@ class Game:
           color = BLUE
         gfxdraw.aacircle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
         gfxdraw.filled_circle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
-    if self.winner == 0 and self.move % 2 == 1:
+    if self.winner == 0 and self.board.player == 1:
       gfxdraw.aatrigon(self.canvas, self.arrow_x - 30, 30, self.arrow_x + 30, 30, self.arrow_x, 70, RED)
       gfxdraw.filled_trigon(self.canvas, self.arrow_x - 29, 31, self.arrow_x + 29, 31, self.arrow_x, 69, RED)
     pygame.display.update()
