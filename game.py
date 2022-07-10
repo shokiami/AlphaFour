@@ -40,7 +40,7 @@ class Game:
         if events["click"] and self.board.placeable(x):
           self.winner = self.board.place(x)
       else:
-        x = self.ai.predict(self.board)
+        x = self.ai.compute(self.board)
         self.winner = self.board.place(x)
     else:
       if self.winner == 1:
