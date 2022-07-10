@@ -12,8 +12,7 @@ class Board:
 
   def place(self, x):
     if not self.placeable(x):
-      print("ERROR: Trying to place in already filled column.")
-      return
+      raise Exception("Trying to place in already filled column.")
     y = 0
     while y < 6 and self.mat[y, x] == 0:
       y += 1
@@ -31,8 +30,7 @@ class Board:
 
   def undo(self):
     if len(self.history) == 0:
-      print("ERROR: Cannot undo.")
-      return
+      raise Exception("No moves to undo.")
     x, y = self.history.pop()
     self.mat[y, x] = 0
     self.count -= 1

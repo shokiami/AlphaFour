@@ -1,4 +1,3 @@
-from re import X
 from board import Board
 import torch
 from torch import nn
@@ -70,10 +69,9 @@ class AI:
   def __init__(self):
     self.model = Model()
 
-  def predict(self, board, depth):
+  def compute(self, board, depth=3):
     if depth == 0:
-      print("ERROR: Depth must be >= 1.")
-      return
+      raise Exception("Depth must be >= 1.")
     best_x = 0
     best_val = 0
     for x in range(7):
@@ -83,18 +81,12 @@ class AI:
           with torch.no_grad():
             val = self.model(board.mat).item()
         else:
-          val = 1 - self.predict(board, depth - 1)[1]
+          val = 1 - self.compute(board, depth - 1)[1]
         if val > best_val:
           best_x = x
           best_val = val
         board.undo()
     return best_x, best_val
-
-  def compute(self, board):
-    depth = 3
-    best_x, best_val = self.predict(board, depth)
-    print(best_val)
-    return best_x
   
   def train(self):
     n = 0
@@ -109,7 +101,7 @@ class AI:
       while winner == 0:
         player = board.player
         if np.random.rand() > epsilon:
-          x = self.predict(board, 1)[0]
+          x = self.compute(board, 1)[0]
         else:
           x = np.random.randint(7)
           while not board.placeable(x):
