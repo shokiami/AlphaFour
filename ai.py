@@ -1,125 +1,92 @@
 from board import Board
+import numpy as np
 import torch
 from torch import nn
 from torch import optim
-import numpy as np
 
-class ConvBlock(nn.Module):
+NUM_GAMES = 10000
+LEARNING_RATE = 0.01
+EPSILON = 0.1
+GAMMA = 0.99
+REWARD = 1000
+
+class QNet(nn.Module):
   def __init__(self):
-    super(ConvBlock, self).__init__()
-    self.conv = nn.Conv2d(1, 128, 3, padding=1)
-    self.bn = nn.BatchNorm2d(128)
+    super(QNet, self).__init__()
+    self.conv = nn.Conv2d(1, 128, 4, 1, 1)
+    self.fc = nn.Linear(3840, 7)
 
   def forward(self, x):
     x = self.conv(x)
-    x = torch.relu(self.bn(x))
-    return x
-
-class ResBlock(nn.Module):
-  def __init__(self):
-    super(ResBlock, self).__init__()
-    self.conv1 = nn.Conv2d(128, 128, 3, padding=1, bias=False)
-    self.bn1 = nn.BatchNorm2d(128)
-    self.conv2 = nn.Conv2d(128, 128, 3, padding=1, bias=False)
-    self.bn2 = nn.BatchNorm2d(128)
-
-  def forward(self, x):
-    res = x
-    x = self.conv1(x)
-    x = torch.relu(self.bn1(x))
-    x = self.conv2(x)
-    x = self.bn2(x)
-    x += res
     x = torch.relu(x)
-    return x
-
-class OutBlock(nn.Module):
-  def __init__(self):
-    super(OutBlock, self).__init__()
-    self.conv = nn.Conv2d(128, 1, 1)
-    self.fc1 = nn.Linear(6 * 7, 32)
-    self.fc2 = nn.Linear(32, 1)
-
-  def forward(self, x):
-    x = self.conv(x)
-    x = torch.relu(self.fc1(x.flatten()))
-    x = torch.sigmoid(self.fc2(x))
-    return x
-
-class Model(nn.Module):
-  def __init__(self):
-    super(Model, self).__init__()
-    self.conv = ConvBlock()
-    self.res1 = ResBlock()
-    self.res2 = ResBlock()
-    self.res3 = ResBlock()
-    self.out = OutBlock()
-
-  def forward(self, mat):
-    x = torch.from_numpy(mat)
-    x = x.unsqueeze(dim=0).unsqueeze(dim=0).float()
-    x = self.conv(x)
-    x = self.res1(x)
-    x = self.res2(x)
-    x = self.res3(x)
-    x = self.out(x)
+    x = torch.flatten(x)
+    x = self.fc(x)
     return x
 
 class AI:
   def __init__(self):
-    self.model = Model()
+    self.q_net = QNet()
 
-  def compute(self, board, depth=3):
-    if depth == 0:
-      raise Exception("Depth must be >= 1.")
-    best_x = 0
-    best_val = 0
-    for x in range(7):
-      if board.placeable(x):
-        board.place(x)
-        if depth == 1:
-          with torch.no_grad():
-            val = self.model(board.mat).item()
-        else:
-          val = 1 - self.compute(board, depth - 1)[1]
-        if val > best_val:
-          best_x = x
-          best_val = val
-        board.undo()
-    return best_x, best_val
-  
+  def compute(self, board):
+    with torch.no_grad():
+      q_vals = self.q_net(self.board_to_tensor(board)).numpy()
+      x = np.argmax(q_vals)
+      q_val = q_vals[x]
+      return x, q_val
+
+  def board_to_tensor(self, board):
+    mat = board.mat.copy()
+    if board.player == 1:
+      mat[mat == 2] = -1
+    else:
+      mat[mat == 1] = -1
+      mat[mat == 2] = 1
+    tensor = torch.tensor(mat, dtype=torch.float).unsqueeze(0)
+    return tensor
+
   def train(self):
-    n = 0
-    epsilon = 0.5
-    lr = 0.01
-    optimizer = optim.Adam(self.model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
-    for i in range(n):
+    optimizer = optim.Adam(self.q_net.parameters(), LEARNING_RATE)
+    loss_func = nn.MSELoss()
+    for i in range(NUM_GAMES):
       board = Board()
       winner = 0
-      history = {"player 1": [], "player 2": []}
+      losses = []
       while winner == 0:
-        player = board.player
-        if np.random.rand() > epsilon:
-          x = self.compute(board, 1)[0]
-        else:
+        # get action according to epsilon-greedy
+        if np.random.rand() < EPSILON:
           x = np.random.randint(7)
           while not board.placeable(x):
             x = np.random.randint(7)
-        winner = board.place(x)
-        history[f"player {player}"].append(board.mat.copy())
-      for player in [1, 2]:
-        if winner == player:
-          val = 1
-        elif winner == 3:
-          val = 0.5
         else:
-          val = 0
-        for mat in history[f"player {player}"]:
-          optimizer.zero_grad()
-          val_hat = self.model(mat)
-          loss = criterion(val_hat, torch.tensor([val]).float())
-          loss.backward()
-          optimizer.step()
-      print(f"game: {i + 1}")
+          x = self.compute(board)[0]
+        # get Q-values
+        q_vals_tensor = self.q_net(self.board_to_tensor(board))
+        q_vals = q_vals_tensor.detach().numpy()
+        # get reward
+        new_q_val = 0
+        if not board.placeable(x):
+          new_q_val = -REWARD
+        else:
+          winner = board.place(x)
+          if winner == board.player:
+            new_q_val = REWARD
+          elif winner == 3 - board.player:
+            new_q_val = -REWARD
+          else:
+            # get value of next state
+            with torch.no_grad():
+              next_val = -np.max(self.q_net(self.board_to_tensor(board)).numpy())
+            # get new Q-value for action
+            new_q_val = GAMMA * next_val
+        # get new Q-values for state
+        new_q_vals = q_vals.copy()
+        new_q_vals[x] = new_q_val
+        new_q_vals_tensor = torch.tensor(new_q_vals)
+        # perform gradient descent
+        optimizer.zero_grad()
+        loss = loss_func(q_vals_tensor, new_q_vals_tensor)
+        loss.backward()
+        optimizer.step()
+        losses.append(loss.item())
+      print(f"game: {i + 1}/{NUM_GAMES}, loss: {np.mean(losses)}")
     print("done training!")
