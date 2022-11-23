@@ -6,7 +6,7 @@ from torch import optim
 
 NUM_GAMES = 10000
 LEARNING_RATE = 0.01
-EPSILON = 0.1
+EPSILON = 0.01
 GAMMA = 0.99
 REWARD = 1000
 
@@ -26,6 +26,8 @@ class QNet(nn.Module):
 class AI:
   def __init__(self):
     self.q_net = QNet()
+    self.optimizer = optim.Adam(self.q_net.parameters(), LEARNING_RATE)
+    self.loss_func = nn.MSELoss()
 
   def compute(self, board):
     with torch.no_grad():
@@ -45,8 +47,6 @@ class AI:
     return tensor
 
   def train(self):
-    optimizer = optim.Adam(self.q_net.parameters(), LEARNING_RATE)
-    loss_func = nn.MSELoss()
     for i in range(NUM_GAMES):
       board = Board()
       winner = 0
@@ -83,10 +83,10 @@ class AI:
         new_q_vals[x] = new_q_val
         new_q_vals_tensor = torch.tensor(new_q_vals)
         # perform gradient descent
-        optimizer.zero_grad()
-        loss = loss_func(q_vals_tensor, new_q_vals_tensor)
+        self.optimizer.zero_grad()
+        loss = self.loss_func(q_vals_tensor, new_q_vals_tensor)
         loss.backward()
-        optimizer.step()
+        self.optimizer.step()
         losses.append(loss.item())
       print(f"game: {i + 1}/{NUM_GAMES}, loss: {np.mean(losses)}")
     print("done training!")
