@@ -5,6 +5,7 @@ class Board:
     self.mat = np.zeros((6, 7))
     self.count = 0
     self.player = 1
+    self.winner = 0
     self.history = []
   
   def placeable(self, x):
@@ -12,7 +13,9 @@ class Board:
 
   def place(self, x):
     if not self.placeable(x):
-      raise Exception("Trying to place in already filled column.")
+      raise Exception('Trying to place in already filled column.')
+    if self.winner != 0:
+      raise Exception('Trying to place in a finished board.')
     y = 0
     while y < 6 and self.mat[y, x] == 0:
       y += 1
@@ -22,19 +25,18 @@ class Board:
     self.player = 3 - self.player
     self.history.append((x, y))
     if self.four_in_a_row(x, y):
-      return self.mat[y, x]
+      self.winner = self.mat[y, x]
     elif self.count == 42:
-      return 3
-    else:
-      return 0
+      self.winner = 3
 
   def undo(self):
     if len(self.history) == 0:
-      raise Exception("No moves to undo.")
+      raise Exception('No moves to undo.')
     x, y = self.history.pop()
     self.mat[y, x] = 0
     self.count -= 1
     self.player = 3 - self.player
+    self.winner = 0
 
   def four_in_a_row(self, x, y):
     for dx, dy in [(1, 0), (1, 1), (0, 1), (1, -1)]:
