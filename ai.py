@@ -1,10 +1,11 @@
 from board import Board
 import numpy as np
 import torch
-from torch import nn
-from torch import optim
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
-NUM_GAMES = 100
+NUM_GAMES = 10000
 LEARNING_RATE = 0.0001
 EPSILON = 0.1
 GAMMA = 0.9
@@ -27,7 +28,23 @@ class AI:
     self.qnet = QNet()
 
   def board_to_tensor(self, board):
-    return torch.FloatTensor(board.mat.copy()).unsqueeze(0)
+    mat = board.mat.copy()
+    mat[mat == 2] = -1.0
+    if board.player == 2:
+      mat *= -1.0
+    return torch.FloatTensor(mat).unsqueeze(0)
+
+  def compute_move(self, board):
+    with torch.no_grad():
+      qvals = self.qnet(self.board_to_tensor(board)).numpy()
+    x = self.safe_argmax(qvals, board)
+    qval = qvals[x]
+    return x, qval
+
+  def safe_argmax(self, qvals, board):
+    for x in np.argsort(qvals):
+      if board.placeable(x):
+        return x
 
   def random_move(self, board):
     x = np.random.randint(7)
@@ -35,14 +52,79 @@ class AI:
       x = np.random.randint(7)
     return x
 
-  def compute_move(self, board):
-    with torch.no_grad():
-      qvals = self.qnet(self.board_to_tensor(board)).numpy()
-    x = np.argmax(qvals)
-    qval = qvals[x]
-    return x, qval
+  def update(self, board_tensor, x, reward, optimizer):
+    qvals_tensor = self.qnet(board_tensor)
+    new_qvals_tensor = qvals_tensor.detach().clone()
+    new_qvals_tensor[x] = reward
+    optimizer.zero_grad()
+    loss = F.mse_loss(qvals_tensor, new_qvals_tensor)
+    loss.backward()
+    optimizer.step()
+    return loss.item()
 
-    # return self.minimax(board, board.player, depth, -np.inf, np.inf)
+  def train(self):
+    self.qnet.train()
+    optimizer = optim.Adam(self.qnet.parameters(), LEARNING_RATE)
+    for i in range(NUM_GAMES):
+      board = Board()
+      losses = []
+
+      board_tensor_p = None
+      x_p = None
+      board_tensor_pp = None
+      x_pp = None
+
+      while board.winner == 0:
+        board_tensor = self.board_to_tensor(board)
+        with torch.no_grad():
+          qvals_tensor = self.qnet(board_tensor)
+        qvals = qvals_tensor.numpy()
+
+        if x_pp:
+          reward = 1.0 + GAMMA * qvals[self.safe_argmax(qvals, board)]
+          losses.append(self.update(board_tensor_pp, x_pp, reward, optimizer))
+
+        if np.random.rand() < EPSILON:
+          x = self.random_move(board)
+        else:
+          x = self.safe_argmax(qvals, board)
+
+        board.place(x)
+
+        board_tensor_pp = board_tensor_p
+        x_pp = x_p
+        board_tensor_p = board_tensor
+        x_p = x
+
+      if board.winner == 3:
+        losses.append(self.update(board_tensor_pp, x_pp, 0.0, optimizer))
+        losses.append(self.update(board_tensor_p, x_p, 0.0, optimizer))
+      else:
+        losses.append(self.update(board_tensor_pp, x_pp, -100.0, optimizer))
+        losses.append(self.update(board_tensor_p, x_p, 100.0, optimizer))
+
+      print(f'game: {i + 1}/{NUM_GAMES}, winner: {int(board.winner)}, loss: {np.mean(losses)}')
+
+    self.qnet.eval()
+    print('done training!')
+
+  # def test(self):
+  #   TEST_GAMES = 100
+  #   wins = 0
+  #   for i in range(TEST_GAMES):
+  #     board = Board()
+  #     while board.winner == 0:
+  #       if board.player == 1:
+  #         x = self.random_move(board)
+  #       else:
+  #         x = self.compute_move(board)[0]
+  #       board.place(x)
+  #     if board.winner == 2:
+  #       wins += 1
+  #   print(f'win rate: {wins}/{TEST_GAMES}')
+
+
+  # return self.minimax(board, board.player, depth, -np.inf, np.inf)
 
   # def minimax(self, board, player, depth, alpha, beta):
   #   best_x = None
@@ -73,66 +155,3 @@ class AI:
   #           return best_x, val
   #         beta = min(beta, val)
   #   return best_x, val
-
-  def train(self):
-    loss_func = nn.MSELoss()
-    adam = optim.Adam(self.qnet.parameters(), LEARNING_RATE)
-    for i in range(NUM_GAMES):
-      board = Board()
-      losses = []
-
-      board.place(self.random_move(board))
-
-      while board.winner == 0:
-        qvals_tensor = self.qnet(self.board_to_tensor(board))
-        qvals = qvals_tensor.detach().numpy()
-        new_qvals = qvals.copy()
-
-        if np.random.rand() < EPSILON:
-          x = np.random.randint(7)
-        else:
-          x = np.argmax(qvals)
-
-        if not board.placeable(x):
-          new_qvals[x] = -1000.0
-        else:
-          board.place(x)
-          if board.winner == 2:
-            reward = 100.0
-          elif board.winner ==3:
-            reward = 0.0
-          else:
-            board.place(self.random_move(board))
-            if board.winner == 1:
-              reward = -100.0
-            else:
-              reward = 1.0
-            with torch.no_grad():
-              next_qvals = self.qnet(self.board_to_tensor(board)).numpy()
-          new_qvals[x] = reward + GAMMA * np.max(next_qvals)
-
-        new_qvals_tensor = torch.tensor(new_qvals)
-
-        adam.zero_grad()
-        loss = loss_func(qvals_tensor, new_qvals_tensor)
-        loss.backward()
-        adam.step()
-        losses.append(loss.item())
-
-      print(f'game: {i + 1}/{NUM_GAMES}, winner: {int(board.winner)}, losses: {np.mean(losses)}')
-    print('done training!')
-
-  # def test(self):
-  #   TEST_GAMES = 100
-  #   wins = 0
-  #   for i in range(TEST_GAMES):
-  #     board = Board()
-  #     while board.winner == 0:
-  #       if board.player == 1:
-  #         x = self.random_move(board)
-  #       else:
-  #         x = self.compute_move(board)[0]
-  #       board.place(x)
-  #     if board.winner == 2:
-  #       wins += 1
-  #   print(f'win rate: {wins}/{TEST_GAMES}')
