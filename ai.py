@@ -9,6 +9,8 @@ NUM_GAMES = 10000
 LEARNING_RATE = 0.0001
 EPSILON = 0.1
 GAMMA = 0.9
+WIN_REWARD = 1000.0
+LIVING_REWARD = 1.0
 
 class QNet(nn.Module):
   def __init__(self):
@@ -84,7 +86,7 @@ class AI:
         action = self.safe_argmax(qvals, board)
 
         if action_pp:
-          reward = 1.0 + GAMMA * qvals[action]
+          reward = LIVING_REWARD + GAMMA * qvals[action]
           losses.append(self.update(state_pp, action_pp, reward, optimizer))
 
         if np.random.rand() < EPSILON:
@@ -98,11 +100,11 @@ class AI:
         action_p = action
 
       if board.winner == 3:
-        losses.append(self.update(state_pp, action_pp, 0.0, optimizer))
         losses.append(self.update(state_p, action_p, 0.0, optimizer))
+        losses.append(self.update(state_pp, action_pp, 0.0, optimizer))
       else:
-        losses.append(self.update(state_pp, action_pp, -100.0, optimizer))
-        losses.append(self.update(state_p, action_p, 100.0, optimizer))
+        losses.append(self.update(state_p, action_p, WIN_REWARD, optimizer))
+        losses.append(self.update(state_pp, action_pp, -WIN_REWARD, optimizer))
 
       print(f'game: {i + 1}/{NUM_GAMES}, winner: {int(board.winner)}, loss: {np.mean(losses)}')
 
