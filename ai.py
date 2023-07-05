@@ -4,30 +4,45 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import os
+import csv
+import matplotlib.pyplot as plt
 
-NUM_GAMES = 10000
 LEARNING_RATE = 0.0001
 EPSILON = 0.1
 GAMMA = 0.9
-WIN_REWARD = 1000.0
-LIVING_REWARD = 1.0
+WIN_REWARD = 10.0
+LIVING_REWARD = 0.1
+
+MODEL = 'qnet.pt'
+LOSSES_CSV = 'losses.csv'
+LOSSES_PLOT = 'losses.png'
 
 class QNet(nn.Module):
   def __init__(self):
     super(QNet, self).__init__()
-    self.conv = nn.Conv2d(1, 32, 4, 1, 1)
-    self.fc = nn.Linear(960, 7)
+    self.conv1 = nn.Conv2d(1, 16, 4, 1, 1)
+    self.conv2 = nn.Conv2d(16, 32, 4, 1, 1)
+    self.conv3 = nn.Conv2d(32, 64, 4, 1, 1)
+    self.fc = nn.Linear(768, 7)
 
-  def forward(self, action):
-    action = self.conv(action)
-    action = torch.relu(action)
-    action = torch.flatten(action)
-    action = self.fc(action)
-    return action
+  def forward(self, x):
+    x = self.conv1(x)
+    x = torch.relu(x)
+    x = self.conv2(x)
+    x = torch.relu(x)
+    x = self.conv3(x)
+    x = torch.relu(x)
+    x = torch.flatten(x)
+    x = self.fc(x)
+    return x
 
 class AI:
   def __init__(self):
-    self.qnet = QNet()
+    if os.path.isfile(MODEL):
+      self.qnet = torch.load(MODEL)
+    else:
+      self.qnet = QNet()
 
   def board_to_state(self, board):
     mat = board.mat.copy()
@@ -66,47 +81,71 @@ class AI:
     return loss.item()
 
   def train(self):
-    self.qnet.train()
+    game = 1
+    if os.path.isfile(LOSSES_CSV):
+      with open(LOSSES_CSV, 'r') as losses_csv:
+        for row in losses_csv:
+          game += 1
+
     optimizer = optim.Adam(self.qnet.parameters(), LEARNING_RATE)
 
-    for i in range(NUM_GAMES):
-      board = Board()
-      losses = []
+    with open(LOSSES_CSV, 'a') as losses_csv:
+      loss_writer = csv.writer(losses_csv)
 
-      state_p = None
-      action_p = None
-      state_pp = None
-      action_pp = None
+      while True:
+        board = Board()
+        losses = []
 
-      while board.winner == 0:
-        state = self.board_to_state(board)
-        with torch.no_grad():
-          qvals = self.qnet(state).numpy()
+        state_p = None
+        action_p = None
+        state_pp = None
+        action_pp = None
 
-        action = self.safe_argmax(qvals, board)
+        while board.winner == 0:
+          state = self.board_to_state(board)
+          with torch.no_grad():
+            qvals = self.qnet(state).numpy()
 
-        if action_pp:
-          reward = LIVING_REWARD + GAMMA * qvals[action]
-          losses.append(self.update(state_pp, action_pp, reward, optimizer))
+          action = self.safe_argmax(qvals, board)
 
-        if np.random.rand() < EPSILON:
-          action = self.random_move(board)
+          if action_pp:
+            reward = LIVING_REWARD + GAMMA * qvals[action]
+            losses.append(self.update(state_pp, action_pp, reward, optimizer))
 
-        board.place(action)
+          if np.random.rand() < EPSILON:
+            action = self.random_move(board)
 
-        state_pp = state_p
-        action_pp = action_p
-        state_p = state
-        action_p = action
+          board.place(action)
 
-      if board.winner == 3:
-        losses.append(self.update(state_p, action_p, 0.0, optimizer))
-        losses.append(self.update(state_pp, action_pp, 0.0, optimizer))
-      else:
-        losses.append(self.update(state_p, action_p, WIN_REWARD, optimizer))
-        losses.append(self.update(state_pp, action_pp, -WIN_REWARD, optimizer))
+          state_pp = state_p
+          action_pp = action_p
+          state_p = state
+          action_p = action
 
-      print(f'game: {i + 1}/{NUM_GAMES}, winner: {int(board.winner)}, loss: {np.mean(losses)}')
+        if board.winner == 3:
+          losses.append(self.update(state_p, action_p, 0.0, optimizer))
+          losses.append(self.update(state_pp, action_pp, 0.0, optimizer))
+        else:
+          losses.append(self.update(state_p, action_p, WIN_REWARD, optimizer))
+          losses.append(self.update(state_pp, action_pp, -WIN_REWARD, optimizer))
 
-    print('done training!')
-    self.qnet.eval()
+        loss = np.mean(losses)
+        loss_writer.writerow([loss])
+        torch.save(self.qnet, MODEL)
+        print(f'game: {game}, winner: {int(board.winner)}, loss: {loss}')
+        game += 1
+
+  def plot(self):
+    losses = []
+    if os.path.isfile(LOSSES_CSV):
+      with open(LOSSES_CSV, 'r') as losses_csv:
+        for row in losses_csv:
+          loss = eval(row)
+          losses.append(loss)
+      plt.figure()
+      plt.title('Loss vs. Game')
+      plt.plot(range(len(losses)), losses)
+      plt.xlabel('Game')
+      plt.ylabel('Loss')
+      plt.savefig(LOSSES_PLOT)
+    
