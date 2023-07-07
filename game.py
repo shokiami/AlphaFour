@@ -1,75 +1,37 @@
-from ai import AI
-from board import Board
-import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
-import pygame
-from pygame import gfxdraw
+import numpy as np
 
-WHITE = (255, 255, 255)
-YELLOW = (255, 235, 0)
-RED = (255, 0, 0)
-BLUE = (0, 0, 255)
+INPUT_SPACE = 42
+ACTION_SPACE = 7
 
-class Game:
-  def __init__(self):
-    pygame.init()
-    pygame.display.set_caption('Connect 4')
-    self.canvas = pygame.display.set_mode((700, 700))
-    self.running = True
-    self.board = Board()
-    self.arrow_x = 350
-    self.ai = AI()
+def init_state():
+  return np.zeros((6, 7), dtype=np.int8)
 
-  def update(self):
-    events = {'click': False, 'quit': False, 'r': False, 'q': False}
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-          events['quit'] = True
-        if event.type == pygame.MOUSEBUTTONDOWN:
-          events['click'] = True
-        if event.type == pygame.KEYDOWN:
-          if event.key == pygame.K_r:
-            events['r'] = True
-          if event.key == pygame.K_q:
-            events['q'] = True
-    if self.board.winner == 0:
-      if self.board.player == 1:
-        x = int(pygame.mouse.get_pos()[0] / 100)
-        self.arrow_x = int(0.2 * (100 * x + 50) + 0.8 * self.arrow_x)
-        if events['click'] and self.board.placeable(x):
-          self.board.place(x)
-      else:
-        x, qval = self.ai.compute_move(self.board)
-        self.board.place(x)
-        print(qval)
-    else:
-      if self.board.winner == 1:
-        print('Red wins!')
-      elif self.board.winner == 2:
-        print('Blue wins!')
-      elif self.board.winner == 3:
-        print('Draw game!')
-      self.board.winner = -1  # pause game
-    if events['r']:
-      self.board = Board()
-      self.board.winner = 0
-      self.arrow_x = 350
-    if events['quit'] or events['q']:
-      self.running = False
+def get_valid_actions(state):
+  return state[0] == 0
 
-  def render(self):
-    self.canvas.fill(WHITE)
-    gfxdraw.box(self.canvas, (0, 100, 700, 700), YELLOW)
-    for x in range(7):
-      for y in range(6):
-        color = WHITE
-        if self.board.mat[y, x] == 1:
-          color = RED
-        if self.board.mat[y, x] == 2:
-          color = BLUE
-        gfxdraw.aacircle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
-        gfxdraw.filled_circle(self.canvas, 100 * x + 50, 100 * y + 150, 40, color)
-    if self.board.winner == 0 and self.board.player == 1:
-      gfxdraw.aatrigon(self.canvas, self.arrow_x - 30, 30, self.arrow_x + 30, 30, self.arrow_x, 70, RED)
-      gfxdraw.filled_trigon(self.canvas, self.arrow_x - 29, 31, self.arrow_x + 29, 31, self.arrow_x, 69, RED)
-    pygame.display.update()
+def get_next_state(state, player, action):
+  next_state = np.copy(state)
+  row = np.max(np.where(next_state[:, action] == 0))
+  next_state[row, action] = player
+  return next_state
+
+def is_terminal(state, prev_action):
+  if prev_action == None:
+    return False, False
+  j0 = prev_action
+  i0 = np.min(np.where(state[:, j0] != 0))
+  player = state[i0, j0]
+  for di, dj in [(1, 0), (1, 1), (0, 1), (1, -1)]:
+    n = 1
+    for sgn in (-1, 1):
+      i = i0 + sgn * di
+      j = j0 + sgn * dj
+      while i >= 0 and i < 6 and j >= 0 and j < 7:
+        if state[i, j] != player:
+          break
+        n += 1
+        i += sgn * di
+        j += sgn * dj
+    if n >= 4:
+      return True, True
+  return np.sum(get_valid_actions(state)) == 0, False
