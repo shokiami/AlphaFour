@@ -4,24 +4,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
-import csv
-import matplotlib.pyplot as plt
-
-NUM_BLOCKS = 4
-NUM_CHANNELS = 64
-
-LEARNING_RATE = 0.001
-WEIGHT_DECAY = 0.0001
 
 MODEL_PATH = 'model.pt'
-# LOSSES_CSV = 'losses.csv'
-# LOSSES_PLOT = 'losses.png'
-
-TRAIN_MCTS_ITRS = 200
-TEST_MCTS_ITRS = 1000
-NUM_ITRS = 1
-GAMES_PER_ITR = 200
-EPOCHS_PER_ITR = 16
+NUM_BLOCKS = 8
+NUM_CHANNELS = 128
+LEARNING_RATE = 0.001
+WEIGHT_DECAY = 0.0001
+MCTS_ITRS = 500
+NUM_ITRS = 10
+GAMES_PER_ITR = 500
+EPOCHS_PER_ITR = 25
 BATCH_SIZE = 32
 
 class ResBlock(nn.Module):
@@ -115,9 +107,11 @@ class AI:
     self.model.eval()
 
   def to_tensor(self, states):
-    return torch.tensor(np.stack((states == 1, states == 0, states == -1)).swapaxes(0, 1), dtype=torch.float32)
+    states = np.array(states)
+    encoded_states = np.stack((states == 1, states == 0, states == -1)).swapaxes(0, 1)
+    return torch.tensor(encoded_states, dtype=torch.float32)
 
-  def parallel_predict(self, states):
+  def predict(self, states):
     with torch.no_grad():
       policies, values = self.model(self.to_tensor(states))
     policies = torch.softmax(policies, axis=1).numpy()
@@ -127,18 +121,9 @@ class AI:
       policies[game] /= np.sum(policies[game])
     return policies, values
 
-  def predict(self, state):
-    with torch.no_grad():
-      policy, value = self.model(self.to_tensor(np.expand_dims(state, 0)))
-    policy = torch.softmax(policy, axis=1).squeeze(0).numpy()
-    policy[np.invert(get_valid_actions(state))] = 0.0
-    policy /= np.sum(policy)
-    value = value.item()
-    return policy, value
-
-  def parallel_mcts_search(self, states):
+  def mcts_search(self, states):
     roots = [MCTSNode(state.copy()) for state in states]
-    for i in range(TRAIN_MCTS_ITRS):
+    for i in range(MCTS_ITRS):
       leafs = []
       leaf_states = []
       for game in range(len(states)):
@@ -147,7 +132,7 @@ class AI:
           node = node.select()
         leafs.append(node)
         leaf_states.append(node.state)
-      policies, values = self.parallel_predict(np.array(leaf_states))
+      policies, values = self.predict(leaf_states)
       for game in range(len(states)):
         leaf = leafs[game]
         terminal, win = is_terminal(leaf.state, leaf.prev_action)
@@ -158,7 +143,6 @@ class AI:
           value = values[game]
           leaf.expand(policy)
         leaf.backpropagate(value)
-      print(i)
     policies = []
     for game in range(len(states)):
       policy = np.zeros(7)
@@ -167,31 +151,12 @@ class AI:
       policies.append(policy / np.sum(policy))
     return policies
 
-  def mcts_search(self, state):
-    root = MCTSNode(state.copy())
-    for i in range(TEST_MCTS_ITRS):
-      node = root
-      while len(node.children) > 0:
-        node = node.select()
-      terminal, win = is_terminal(node.state, node.prev_action)
-      if terminal:
-        value = -1.0 if win else 0.0
-      else:
-        policy, value = self.predict(node.state)
-        node.expand(policy)
-      node.backpropagate(value)
-    policy = np.zeros(7)
-    for child in root.children:
-      policy[child.prev_action] = child.visit_count
-    policy /= np.sum(policy)
-    return policy
-
   def self_play(self):
     examples = []
     player = 1
     states = GAMES_PER_ITR * [init_state()]
     while len(states) > 0:
-      policies = self.parallel_mcts_search([player * state for state in states])
+      policies = self.mcts_search([player * state for state in states])
       curr_examples = []
       for game in reversed(range(len(states))):
         action = np.random.choice(7, p=policies[game])
@@ -206,7 +171,7 @@ class AI:
           examples += curr_examples
           states.pop(game)
       player = -player
-      print(f'games remaining: {len(states)}')
+      print(f'game: {GAMES_PER_ITR - len(states)}/{GAMES_PER_ITR}')
     return examples
 
   def train(self, examples):
@@ -215,7 +180,7 @@ class AI:
       np.random.shuffle(examples)
       for i in range(0, len(examples), BATCH_SIZE):
         states, policies, values = zip(*examples[i:min(i + BATCH_SIZE, len(examples))])
-        states = self.to_tensor(np.array(states))
+        states = self.to_tensor(states)
         policies = torch.tensor(np.array(policies), dtype=torch.float32)
         values = torch.tensor(np.array(values), dtype=torch.float32).unsqueeze(1)
         pred_policies, pred_values = self.model(states)
@@ -230,10 +195,26 @@ class AI:
     for i in range(NUM_ITRS):
       examples = self.self_play()
       self.train(examples)
-      # torch.save(self.model.state_dict(), MODEL_PATH)
+      torch.save(self.model.state_dict(), MODEL_PATH)
       print(f'iteration: {i + 1}/{NUM_ITRS}')
 
   def compute(self, state):
-    policy = self.mcts_search(-state)
-    print(policy)
+    policy = self.mcts_search([-state])[0]
+    print(policy.round(4))
     return np.argmax(policy)
+
+def main():
+  ai = AI()
+  ai.learn()
+  state = np.array([
+    [ 0,  0,  0,  0,  0,  0,  0],
+    [ 0,  0,  0,  0,  0,  0,  0],
+    [ 0,  0,  0,  0,  0,  0,  0],
+    [ 0,  -1,  1,  0,  0,  0,  0],
+    [ 1, -1,  1,  0,  0,  0,  0],
+    [-1, -1, -1,  1,  1,  0,  0],
+  ])
+  print(ai.compute(state))
+
+if __name__ == '__main__':
+  main()

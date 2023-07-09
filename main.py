@@ -39,38 +39,44 @@ def main():
   state = init_state()
   player = 1
   arrow_x = 350
-  status = 'running'
   ai = AI()
-  while status != 'stopped':
+  terminal = False
+  running = True
+  while running:
     events = get_events()
-    if status == 'running':
+    if not terminal:
       if player == 1:
         action = int(pygame.mouse.get_pos()[0] / 100)
         arrow_x = int(0.2 * (100 * action + 50) + 0.8 * arrow_x)
         if events['click'] and get_valid_actions(state)[action]:
           state = get_next_state(state, player, action)
+          terminal, win = is_terminal(state, action)
+          if terminal:
+            if win:
+              print('Red wins!')
+            else:
+              print('Draw game!')
+          else:
+            player = -player
       else:
-        action, qval = ai.compute_move(state)
+        action = ai.compute(state)
         state = get_next_state(state, player, action)
-        # print(qval)
-      terminal, win = is_terminal(state, action)
-      if terminal:
-        status = 'paused'
-        if not win:
-          print('Draw game!')
-        elif player == 1:
-          print('Red wins!')
+        terminal, win = is_terminal(state, action)
+        if terminal:
+          if win:
+            print('Blue wins!')
+          else:
+            print('Draw game!')
         else:
-          print('Blue wins!')
-      player = -player
-    render(state, canvas, arrow_x if player == 1 and status == 'running' else None)
+          player = -player
+    render(state, canvas, arrow_x if player == 1 and not terminal else None)
     if events['r']:
       state = init_state()
       player = 1
       arrow_x = 350
-      status = 'running'
+      terminal = False
     if events['quit'] or events['q']:
-      status = 'stopped'
+      running = False
 
 if __name__ == '__main__':
   main()
