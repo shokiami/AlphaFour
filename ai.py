@@ -1,16 +1,14 @@
-from game import init_state, get_valid_actions, get_next_state, is_terminal, INPUT_SPACE, ACTION_SPACE
+from game import init_state, get_valid_actions, get_next_state, is_terminal
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 import os
 import csv
 import matplotlib.pyplot as plt
 
-NUM_HIDDEN = 4
-NUM_CHANNELS = 64
-
+NUM_BLOCKS = 8
+NUM_CHANNELS = 128
 
 LEARNING_RATE = 0.001
 WEIGHT_DECAY = 0.0001
@@ -19,45 +17,11 @@ MODEL_PATH = 'model.pt'
 # LOSSES_CSV = 'losses.csv'
 # LOSSES_PLOT = 'losses.png'
 
-UCB_C = 2.0
-MCTS_ROLLOUTS = 10
-
-NUM_ITRS = 2
-GAMES_PER_ITR = 10
-NUM_EPOCHS = 8
-BATCH_SIZE = 4
-
-NUM_PARALLEL_GAMES = 100
-
-class MCTSNode:
-  def __init__(self, state, parent=None, prev_action=None, prior=0):
-    self.state = state
-    self.parent = parent
-    self.prev_action = prev_action
-    self.prior = prior
-    self.children = []
-    self.visit_count = 0
-    self.value_sum = 0
-
-  def select(self):
-    return max(self.children, key=lambda c: c.ucb())
-
-  def ucb(self):
-    q_val = 0.0 if self.visit_count == 0 else 1.0 - (self.value_sum / self.visit_count + 1.0) / 2.0
-    return q_val + UCB_C * self.prior * np.sqrt(self.parent.visit_count / (self.visit_count + 1.0))
-
-  def expand(self, policy):
-    for action, prob in enumerate(policy):
-      if prob > 0:
-        next_state = -get_next_state(self.state, 1, action)
-        child = MCTSNode(next_state, self, action, prob)
-        self.children.append(child)
-
-  def backpropagate(self, value):
-    self.value_sum += value
-    self.visit_count += 1
-    if self.parent is not None:
-      self.parent.backpropagate(-value)
+MCTS_ITRS = 500
+NUM_ITRS = 1
+GAMES_PER_ITR = 500
+EPOCHS_PER_ITR = 4
+BATCH_SIZE = 32
 
 class ResBlock(nn.Module):
   def __init__(self, in_channels, out_channels):
@@ -92,14 +56,14 @@ class ResNet(nn.Module):
       nn.BatchNorm2d(32),
       nn.ReLU(),
       nn.Flatten(),
-      nn.Linear(32 * INPUT_SPACE, ACTION_SPACE)
+      nn.Linear(32 * 42, 7)
     )
     self.value_head = nn.Sequential(
       nn.Conv2d(num_channels, 3, kernel_size=3, padding=1),
       nn.BatchNorm2d(3),
       nn.ReLU(),
       nn.Flatten(),
-      nn.Linear(3 * INPUT_SPACE, 1),
+      nn.Linear(3 * 42, 1),
       nn.Tanh()
     )
 
@@ -111,9 +75,39 @@ class ResNet(nn.Module):
     value = self.value_head(x)
     return policy, value
 
+class MCTSNode:
+  def __init__(self, state, parent=None, prev_action=None, prior=0):
+    self.state = state
+    self.parent = parent
+    self.prev_action = prev_action
+    self.prior = prior
+    self.children = []
+    self.visit_count = 0
+    self.value_sum = 0
+
+  def select(self):
+    return max(self.children, key=lambda c: c.ucb())
+
+  def ucb(self):
+    q_val = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
+    return q_val + 2.0 * self.prior * np.sqrt(self.parent.visit_count / (self.visit_count + 1.0))
+
+  def expand(self, policy):
+    for action, prob in enumerate(policy):
+      if prob > 0:
+        next_state = -get_next_state(self.state, 1, action)
+        child = MCTSNode(next_state, self, action, prob)
+        self.children.append(child)
+
+  def backpropagate(self, value):
+    self.value_sum += value
+    self.visit_count += 1
+    if self.parent is not None:
+      self.parent.backpropagate(-value)
+
 class AI:
   def __init__(self):
-    self.model = ResNet(NUM_HIDDEN, NUM_CHANNELS)
+    self.model = ResNet(NUM_BLOCKS, NUM_CHANNELS)
     if os.path.isfile(MODEL_PATH):
       self.model.load_state_dict(torch.load(MODEL_PATH))
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
@@ -133,7 +127,7 @@ class AI:
   def mcts_search(self, state):
     self.model.eval()
     root = MCTSNode(state.copy())
-    for i in range(MCTS_ROLLOUTS):
+    for i in range(MCTS_ITRS):
       node = root
       while len(node.children) > 0:
         node = node.select()
@@ -144,22 +138,21 @@ class AI:
         policy, value = self.predict(node.state)
         node.expand(policy)
       node.backpropagate(value)
-    action_probs = np.zeros(ACTION_SPACE)
+    policy = np.zeros(7)
     for child in root.children:
-      action_probs[child.prev_action] = child.visit_count
-    action_probs /= np.sum(action_probs)
-    return action_probs
+      policy[child.prev_action] = child.visit_count
+    policy /= np.sum(policy)
+    return policy
 
   def self_play(self):
     examples = []
     player = 1
     state = init_state()
     while True:
-      action_probs = self.mcts_search(player * state) ** (1 / 1.25)
-      action_probs /= action_probs.sum()
-      action = np.random.choice(7, p=action_probs)
+      policy = self.mcts_search(player * state)
+      action = np.random.choice(7, p=policy)
       state = get_next_state(state, player, action)
-      examples.append([player * state, action_probs, 0.0])
+      examples.append([player * state, policy, 0.0])
       terminal, win = is_terminal(state, action)
       if terminal:
         if win:
@@ -172,32 +165,29 @@ class AI:
     self.model.train()
     np.random.shuffle(examples)
     for i in range(0, len(examples), BATCH_SIZE):
-      states, action_probs, values = zip(*examples[i:min(i + BATCH_SIZE, len(examples))])
+      states, policies, values = zip(*examples[i:min(i + BATCH_SIZE, len(examples))])
       states = self.to_tensor(np.array(states))
-      action_probs = torch.tensor(np.array(action_probs), dtype=torch.float32)
+      policies = torch.tensor(np.array(policies), dtype=torch.float32)
       values = torch.tensor(np.array(values), dtype=torch.float32).unsqueeze(1)
       pred_policies, pred_values = self.model(states)
-      # print(pred_policies, action_probs)
-      # print(pred_values, values)
-      loss = F.cross_entropy(pred_policies, action_probs) + F.mse_loss(pred_values, values)
+      loss = F.cross_entropy(pred_policies, policies) + F.mse_loss(pred_values, values)
       self.optimizer.zero_grad()
       loss.backward()
       self.optimizer.step()
-      print(loss.item())
 
   def learn(self):
     for i in range(NUM_ITRS):
       examples = []
-      for j in range(GAMES_PER_ITR):
+      for game in range(GAMES_PER_ITR):
         examples += self.self_play()
-        print(j)
-      for epoch in range(NUM_EPOCHS):
+        print(f'game: {game + 1}/{GAMES_PER_ITR}')
+      for epoch in range(EPOCHS_PER_ITR):
         self.train(examples)
-        print(epoch)
-      # torch.save(self.model.state_dict(), MODEL_PATH)
-      print(i)
+        print(f'epoch: {epoch + 1}/{EPOCHS_PER_ITR}')
+      torch.save(self.model.state_dict(), MODEL_PATH)
+      print(f'iteration: {i + 1}/{NUM_ITRS}')
 
   def compute(self, state):
-    action_probs = self.mcts_search(-state)
-    print(action_probs)
-    return np.argmax(action_probs)
+    policy = self.mcts_search(-state)
+    print(policy)
+    return np.argmax(policy)

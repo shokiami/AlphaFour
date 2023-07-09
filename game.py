@@ -1,8 +1,5 @@
 import numpy as np
 
-INPUT_SPACE = 42
-ACTION_SPACE = 7
-
 def init_state():
   return np.zeros((6, 7), dtype=np.int8)
 
