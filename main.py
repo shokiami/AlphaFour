@@ -20,11 +20,12 @@ def render(state, canvas, arrow_x):
   gfxdraw.box(canvas, (0, 100, 700, 700), (255, 235, 0))
   for i in range(6):
     for j in range(7):
-      color = (255, 255, 255)
       if state[i, j] == 1:
         color = (255, 0, 0)
-      if state[i, j] == -1:
+      elif state[i, j] == -1:
         color = (0, 0, 255)
+      else:
+        color = (255, 255, 255)
       gfxdraw.aacircle(canvas, 100 * j + 50, 100 * i + 150, 40, color)
       gfxdraw.filled_circle(canvas, 100 * j + 50, 100 * i + 150, 40, color)
   if arrow_x != None:
@@ -52,23 +53,15 @@ def main():
           state = get_next_state(state, player, action)
           terminal, win = is_terminal(state, action)
           if terminal:
-            if win:
-              print('Red wins!')
-            else:
-              print('Draw game!')
-          else:
-            player = -player
+            print('Red wins!') if win else print('Draw game!')
+          player = -player
       else:
         action = ai.compute(state)
         state = get_next_state(state, player, action)
         terminal, win = is_terminal(state, action)
         if terminal:
-          if win:
-            print('Blue wins!')
-          else:
-            print('Draw game!')
-        else:
-          player = -player
+          print('Blue wins!') if win else print('Draw game!')
+        player = -player
     render(state, canvas, arrow_x if player == 1 and not terminal else None)
     if events['r']:
       state = init_state()
