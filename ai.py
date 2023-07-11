@@ -238,7 +238,7 @@ class AI:
         np.random.shuffle(examples)
         losses = []
         for i in range(0, len(examples), BATCH_SIZE):
-          states, policies, values = zip(*examples[i:min(i + BATCH_SIZE, len(examples) - 1)])
+          states, policies, values = zip(*examples[i: i + BATCH_SIZE])
           policies = torch.tensor(np.array(policies), dtype=torch.float32)
           values = torch.tensor(np.array(values), dtype=torch.float32).unsqueeze(1)
           pred_policies, pred_values = self.model(self.to_tensor(states))
