@@ -4,29 +4,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
-import csv
 import matplotlib.pyplot as plt
 
-torch.manual_seed(0)
-np.random.seed(0)
-
 MODEL_PATH = 'model.pt'
-LOSSES_CSV = 'losses.csv'
 LOSSES_PLOT = 'losses.png'
-
 NUM_BLOCKS = 4
 NUM_CHANNELS = 64
 LEARNING_RATE = 0.001
-WEIGHT_DECAY = 0.0001
-
-MCTS_ITRS = 10
-UCB_C = 2.0
-
-GAMES_PER_ITR = 10
-
+MCTS_ITRS = 100
+GAMES_PER_ITR = 100
 EPOCHS_PER_ITR = 10
 BATCH_SIZE = 64
-
 NUM_ITRS = 1
 
 class ResBlock(nn.Module):
@@ -92,11 +80,11 @@ class MCTSNode:
     self.value_sum = 0
 
   def select(self):
-    return max(self.children, key=lambda c: c.ucb())
+    return max(self.children, key=lambda child: child.ucb())
 
   def ucb(self):
     q_val = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
-    return q_val + UCB_C * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
+    return q_val + 2.0 * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
 
   def expand(self, policy):
     for action, prob in enumerate(policy):
@@ -116,8 +104,7 @@ class AI:
     self.model = ResNet(NUM_BLOCKS, NUM_CHANNELS)
     if os.path.isfile(MODEL_PATH):
       self.model.load_state_dict(torch.load(MODEL_PATH))
-    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    self.model.eval()
+    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
 
   def to_tensor(self, states):
     states = np.stack(states)
@@ -128,29 +115,31 @@ class AI:
     with torch.no_grad():
       policies, values = self.model(self.to_tensor(states))
     policies = torch.softmax(policies, 1).numpy()
-    values = torch.tanh(values).numpy()
+    values = values.numpy()
     for game in range(len(states)):
       policies[game][~get_valid_actions(states[game])] = 0.0
       policies[game] /= np.sum(policies[game])
     return policies, values
 
   def mcts_search(self, states):
-    roots = [MCTSNode(state.copy()) for state in states]
+    self.model.eval()
+    roots = [MCTSNode(state) for state in states]
     for i in range(MCTS_ITRS):
       leafs = []
       for game in range(len(states)):
         node = roots[game]
         while len(node.children) > 0:
           node = node.select()
-        leafs.append(node)
-      policies, values = self.predict([leaf.state for leaf in leafs])
-      for game in range(len(states)):
-        terminal, win = is_terminal(leafs[game].state, leafs[game].prev_action)
+        terminal, win = is_terminal(node.state, node.prev_action)
         if terminal:
-         leafs[game].backpropagate(-1.0) if win else leafs[game].backpropagate(0.0)
+          node.backpropagate(-1.0) if win else node.backpropagate(0.0)
         else:
-          leafs[game].expand(policies[game])
-          leafs[game].backpropagate(values[game])
+          leafs.append(node)
+      if len(leafs) > 0:
+        policies, values = self.predict([leaf.state for leaf in leafs])
+        for j in range(len(leafs)):
+          leafs[j].expand(policies[j])
+          leafs[j].backpropagate(values[j])
     policies = []
     for game in range(len(states)):
       policy = np.zeros(7)
@@ -167,7 +156,7 @@ class AI:
     curr_examples = [[] for game in range(GAMES_PER_ITR)]
     move = 0
     while len(states) > 0:
-      input_states = [player * state.copy() for state in states]
+      input_states = [player * state for state in states]
       policies = self.mcts_search(input_states)
       for game in reversed(range(len(states))):
         curr_examples[game].append([input_states[game], policies[game], 0.0])
@@ -181,53 +170,41 @@ class AI:
               curr_examples[game][i][2] = 1.0 if (len(curr_examples[game]) - i) % 2 == 1 else -1.0
           examples += curr_examples[game]
           states.pop(game)
+          curr_examples.pop(game)
       print(f'move: {move + 1}, remaining: {len(states)}')
       player = -player
       move += 1
     return examples
 
   def train(self, examples):
+    self.model.train()
+    np.random.shuffle(examples)
     losses = []
-    if os.path.isfile(LOSSES_CSV):
-      with open(LOSSES_CSV, 'r') as losses_csv:
-        for row in losses_csv:
-          losses.append(eval(row))
-    with open(LOSSES_CSV, 'a') as losses_csv:
-      loss_writer = csv.writer(losses_csv)
-      self.model.train()
-      for epoch in range(EPOCHS_PER_ITR):
-        np.random.shuffle(examples)
-        losses = []
-        for i in range(0, len(examples), BATCH_SIZE):
-          states, policies, values = zip(*examples[i: i + BATCH_SIZE])
-          policies = torch.tensor(np.array(policies), dtype=torch.float32)
-          values = torch.tensor(np.array(values), dtype=torch.float32).unsqueeze(1)
-          pred_policies, pred_values = self.model(self.to_tensor(states))
-          loss = F.cross_entropy(pred_policies, policies) + F.mse_loss(pred_values, values)
-          self.optimizer.zero_grad()
-          loss.backward()
-          self.optimizer.step()
-          losses.append(loss.item())
-        loss_writer.writerow([np.mean(losses)])
-        print(f'epoch: {epoch + 1}/{EPOCHS_PER_ITR}')
-      self.model.eval()
-    self.plot()
+    for i in range(0, len(examples), BATCH_SIZE):
+      states, policies, values = zip(*examples[i: i + BATCH_SIZE])
+      policies = torch.tensor(np.array(policies), dtype=torch.float32)
+      values = torch.tensor(np.array(values), dtype=torch.float32).unsqueeze(1)
+      pred_policies, pred_values = self.model(self.to_tensor(states))
+      loss = F.cross_entropy(pred_policies, policies) + F.mse_loss(pred_values, values)
+      self.optimizer.zero_grad()
+      loss.backward()
+      self.optimizer.step()
+      losses.append(loss.item())
+    return np.mean(losses)
 
   def learn(self):
+    losses = []
     for i in range(NUM_ITRS):
       examples = self.self_play()
-      self.train(examples)
+      for epoch in range(EPOCHS_PER_ITR):
+        loss = self.train(examples)
+        losses.append(loss)
+        print(f'epoch: {epoch + 1}/{EPOCHS_PER_ITR}')
       torch.save(self.model.state_dict(), MODEL_PATH)
+      self.plot(losses)
       print(f'iteration: {i + 1}/{NUM_ITRS}')
 
-  def plot(self):
-    losses = []
-    if not os.path.isfile(LOSSES_CSV):
-      return
-    with open(LOSSES_CSV, 'r') as losses_csv:
-      for row in losses_csv:
-        loss = eval(row)
-        losses.append(loss)
+  def plot(self, losses):
     plt.figure()
     plt.title('Loss vs. Epoch')
     plt.plot(range(len(losses)), losses)
@@ -243,15 +220,6 @@ class AI:
 def main():
   ai = AI()
   ai.learn()
-  state = np.array([
-    [ 0,  0,  0,  0,  0,  0,  0],
-    [ 0,  0,  0,  0,  0,  0,  0],
-    [ 0,  0,  0,  0,  0,  0,  0],
-    [ 0,  1,  0,  0,  1,  0,  0],
-    [ 1, -1,  1, -1,  1,  0, -1],
-    [ 1,  1, -1,  1,  1,  0,  1],
-  ])
-  print(ai.compute(state))
 
 if __name__ == '__main__':
   main()
