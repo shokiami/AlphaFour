@@ -31,4 +31,4 @@ def is_terminal(state, prev_action):
         j += sgn * dj
     if n >= 4:
       return True, True
-  return np.sum(get_valid_actions(state)) == 0, False
+  return np.all(~get_valid_actions(state)), False
