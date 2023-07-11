@@ -19,7 +19,7 @@ NUM_CHANNELS = 64
 LEARNING_RATE = 0.001
 WEIGHT_DECAY = 0.0001
 
-MCTS_ITRS = 11
+MCTS_ITRS = 10
 UCB_C = 2.0
 
 GAMES_PER_ITR = 10
@@ -95,8 +95,8 @@ class MCTSNode:
     return max(self.children, key=lambda c: c.ucb())
 
   def ucb(self):
-    q_val = 0.0 if self.visit_count == 0 else 1.5 - 0.5 * self.value_sum / self.visit_count
-    return q_val + UCB_C * self.prior * np.sqrt(self.parent.visit_count / (self.visit_count + 1.0))
+    q_val = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
+    return q_val + UCB_C * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
 
   def expand(self, policy):
     for action, prob in enumerate(policy):
