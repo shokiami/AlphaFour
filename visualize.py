@@ -35,7 +35,7 @@ def save_gif(gen, actions):
     if terminal:
       break
   images.insert(0, images.pop())
-  images[0].save(os.path.join(EXAMPLES, f'{gen}.gif'), format='GIF', append_images=images, save_all=True, duration=800)
+  images[0].save(os.path.join(EXAMPLES, f'{gen}.gif'), format='GIF', append_images=images, save_all=True, duration=800, loop=0)
 
 def main():
   if os.path.isdir(EXAMPLES):
