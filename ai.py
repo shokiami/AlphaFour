@@ -99,11 +99,11 @@ class MCTSNode:
         child = MCTSNode(self.game, next_state, self, i, policy[i])
         self.children.append(child)
 
-  def back_propagate(self, value):
+  def backpropagate(self, value):
     self.value_sum += value
     self.visit_count += 1
     if self.parent is not None:
-      self.parent.back_propagate(-value)
+      self.parent.backpropagate(-value)
 
 class AI:
   def __init__(self, game):
@@ -129,7 +129,7 @@ class AI:
           node = node.select()
         terminal, win = self.game.is_terminal(node.state, node.prev_action)
         if terminal:
-          node.back_propagate(-1.0) if win else node.back_propagate(0.0)
+          node.backpropagate(-1.0) if win else node.backpropagate(0.0)
         else:
           leafs.append(node)
       if len(leafs) > 0:
@@ -142,7 +142,7 @@ class AI:
           policies[j][~self.game.get_valid_actions(leaf_states[j])] = 0.0
           policies[j] /= np.sum(policies[j])
           leafs[j].expand(policies[j])
-          leafs[j].back_propagate(values[j])
+          leafs[j].backpropagate(values[j])
     policies = []
     for root in roots:
       policy = np.zeros(self.game.action_size)
@@ -174,8 +174,8 @@ class AI:
           examples += curr_examples[i]
           states.pop(i)
           curr_examples.pop(i)
-      print(f'move: {move + 1}, remaining: {len(states)}')
       player = -player
+      print(f'move: {move + 1}, remaining: {len(states)}')
       move += 1
     return examples
 
