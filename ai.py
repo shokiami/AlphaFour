@@ -5,20 +5,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import matplotlib.pyplot as plt
+import time
+from datetime import timedelta
 
 torch.manual_seed(0)
 np.random.seed(0)
 
 MODEL_PATH = 'model.pt'
 LOSSES_PLOT = 'losses.png'
-NUM_BLOCKS = 4
-NUM_CHANNELS = 64
+NUM_BLOCKS = 8
+NUM_CHANNELS = 128
 LEARNING_RATE = 0.001
-MCTS_ITRS = 10
-GAMES_PER_ITR = 10
+MCTS_ITRS = 100
+GAMES_PER_ITR = 500
 EPOCHS_PER_ITR = 10
 BATCH_SIZE = 64
-NUM_ITRS = 1
+NUM_ITRS = 10
 
 class ResBlock(nn.Module):
   def __init__(self, num_channels):
@@ -122,6 +124,7 @@ class AI:
     self.model.eval()
     roots = [MCTSNode(self.game, state) for state in states]
     for i in range(MCTS_ITRS):
+      print(i)
       leafs = []
       for root in roots:
         node = root
@@ -193,7 +196,6 @@ class AI:
       loss.backward()
       self.optimizer.step()
       losses.append(loss.item())
-      print(loss.item())
     return np.mean(losses)
 
   def learn(self):
@@ -222,9 +224,12 @@ class AI:
     return np.argmax(policy)
 
 def main():
+  start = time.time()
   cf = ConnectFour()
   ai = AI(cf)
   ai.learn()
+  stop = time.time()
+  print(f'total time: {timedelta(seconds=stop - start)}')
 
 if __name__ == '__main__':
   main()
