@@ -73,9 +73,8 @@ def main():
   if os.path.isdir(MODELS):
     shutil.rmtree(MODELS)
   os.makedirs(MODELS)
-  losses = []
-  plot(losses)
   torch.save(ai.model.state_dict(), os.path.join(MODELS, 'model_0.pt'))
+  losses = []
   for i in range(NUM_ITRS):
     examples = self_play(ai)
     for epoch in range(EPOCHS_PER_ITR):
