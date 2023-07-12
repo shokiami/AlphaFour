@@ -4,9 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 
-torch.manual_seed(0)
-np.random.seed(0)
-
 MODELS = 'models'
 NUM_BLOCKS = 8
 NUM_CHANNELS = 128
@@ -99,12 +96,11 @@ class MCTSNode:
       self.parent.backpropagate(-value)
 
 class AlphaFour:
-  def __init__(self, game, gen=100):
+  def __init__(self, game, gen):
     self.game = game
     self.model = ResNet(game, NUM_BLOCKS, NUM_CHANNELS)
-    model_path = os.path.join(MODELS, f'model_{gen}.pt')
-    if os.path.isfile(model_path):
-      self.model.load_state_dict(torch.load(model_path))
+    if gen > 0:
+      self.model.load_state_dict(torch.load(os.path.join(MODELS, f'model_{gen}.pt')))
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
 
   def to_tensor(self, states):

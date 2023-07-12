@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import time
 from datetime import timedelta
 
+torch.manual_seed(0)
+np.random.seed(0)
+
 LOSS_PLOT = 'loss.png'
 GAMES_PER_GEN = 100
 EPOCHS_PER_GEN = 10
@@ -58,21 +61,13 @@ def train(ai, examples):
     losses.append(loss.item())
   return np.mean(losses)
 
-def plot(losses):
-  plt.figure()
-  plt.title('Loss vs. Epoch')
-  plt.plot(range(len(losses)), losses)
-  plt.xlabel('Epoch')
-  plt.ylabel('Loss')
-  plt.savefig(LOSS_PLOT)
-
 def main():
   start = time.time()
+  game = ConnectFour()
+  ai = AlphaFour(game, 0)
   if os.path.isdir(MODELS):
     shutil.rmtree(MODELS)
   os.makedirs(MODELS)
-  cf = ConnectFour()
-  ai = AlphaFour(cf)
   torch.save(ai.model.state_dict(), os.path.join(MODELS, 'model_0.pt'))
   losses = []
   for i in range(NUM_GENS):
@@ -81,7 +76,12 @@ def main():
       loss = train(ai, examples)
       losses.append(loss)
       print(f'epoch: {epoch + 1}/{EPOCHS_PER_GEN}')
-    plot(losses)
+    plt.figure()
+    plt.title('Loss vs. Epoch')
+    plt.plot(range(len(losses)), losses)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.savefig(LOSS_PLOT)
     if (i + 1) % 10 == 0:
       torch.save(ai.model.state_dict(), os.path.join(MODELS, f'model_{i + 1}.pt'))
     print(f'generation: {i + 1}/{NUM_GENS}')

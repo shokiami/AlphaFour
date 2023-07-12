@@ -1,5 +1,5 @@
 from game import ConnectFour
-from ai import AI
+from ai import AlphaFour
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
 import pygame
@@ -36,10 +36,10 @@ def render(state, canvas, arrow_x=None):
 def main():
   pygame.init()
   pygame.display.set_caption('AlphaFour')
-  cf = ConnectFour()
-  ai = AI(cf)
-  state = cf.init_state()
   canvas = pygame.display.set_mode((700, 700))
+  game = ConnectFour()
+  state = game.init_state()
+  ai = AlphaFour(game, 100)
   arrow_x = 350
   terminal = False
   while True:
@@ -49,23 +49,23 @@ def main():
         action = int(pygame.mouse.get_pos()[0] / 100)
         arrow_x = int(0.2 * (100 * action + 50) + 0.8 * arrow_x)
         render(state, canvas, arrow_x)
-        if events['click'] and cf.valid_actions(state)[action]:
+        if events['click'] and game.valid_actions(state)[action]:
           break
       if events['r']:
-        state = cf.init_state()
+        state = game.init_state()
         terminal = False
       if events['quit'] or events['q']:
         exit()
-    state = cf.next_state(state, 1, action)
+    state = game.next_state(state, 1, action)
     render(state, canvas)
-    terminal, win = cf.is_terminal(state, action)
+    terminal, win = game.is_terminal(state, action)
     if terminal:
       print('You win!') if win else print('Draw game!')
       continue
     action = ai.compute(state)
-    state = cf.next_state(state, -1, action)
+    state = game.next_state(state, -1, action)
     render(state, canvas)
-    terminal, win = cf.is_terminal(state, action)
+    terminal, win = game.is_terminal(state, action)
     if terminal:
       print('AlphaFour wins!') if win else print('Draw game!')
 
