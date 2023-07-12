@@ -99,8 +99,9 @@ class AlphaFour:
   def __init__(self, game, gen):
     self.game = game
     self.model = ResNet(game, NUM_BLOCKS, NUM_CHANNELS)
-    if gen > 0:
-      self.model.load_state_dict(torch.load(os.path.join(MODELS, f'model_{gen}.pt')))
+    model_path = os.path.join(MODELS, f'model_{gen}.pt')
+    if os.path.exists(model_path) or gen > 0:
+      self.model.load_state_dict(torch.load(model_path))
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
 
   def to_tensor(self, states):
