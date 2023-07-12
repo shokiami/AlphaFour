@@ -1,10 +1,16 @@
-# Connect4AI
+# AlphaFour
 
-Welcome to my Connect 4 AI!
+A Connect Four AI that learns from scratch via self-play deep reinforcement learning.
 
-The AI starts tabula-rasa and learns via self-play deep reinforcement learning.
+Training:
+```
+python3 train.py
+```
 
 Running:
 ```
 python3 main.py
 ```
+
+Results (~4 hours of training):
+![](loss.png)
