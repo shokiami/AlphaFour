@@ -10,16 +10,16 @@ import time
 from datetime import timedelta
 
 LOSS_PLOT = 'loss.png'
-GAMES_PER_ITR = 100
-EPOCHS_PER_ITR = 10
+GAMES_PER_GEN = 100
+EPOCHS_PER_GEN = 10
 BATCH_SIZE = 32
-NUM_ITRS = 100
+NUM_GENS = 100
 
 def self_play(ai):
   examples = []
   player = 1
-  states = [ai.game.init_state() for i in range(GAMES_PER_ITR)]
-  curr_examples = [[] for i in range(GAMES_PER_ITR)]
+  states = [ai.game.init_state() for i in range(GAMES_PER_GEN)]
+  curr_examples = [[] for i in range(GAMES_PER_GEN)]
   move = 0
   while len(states) > 0:
     input_states = [player * state for state in states]
@@ -75,16 +75,16 @@ def main():
   os.makedirs(MODELS)
   torch.save(ai.model.state_dict(), os.path.join(MODELS, 'model_0.pt'))
   losses = []
-  for i in range(NUM_ITRS):
+  for i in range(NUM_GENS):
     examples = self_play(ai)
-    for epoch in range(EPOCHS_PER_ITR):
+    for epoch in range(EPOCHS_PER_GEN):
       loss = train(ai, examples)
       losses.append(loss)
-      print(f'epoch: {epoch + 1}/{EPOCHS_PER_ITR}')
+      print(f'epoch: {epoch + 1}/{EPOCHS_PER_GEN}')
     plot(losses)
     if (i + 1) % 10 == 0:
       torch.save(ai.model.state_dict(), os.path.join(MODELS, f'model_{i + 1}.pt'))
-    print(f'iteration: {i + 1}/{NUM_ITRS}')
+    print(f'generation: {i + 1}/{NUM_GENS}')
   stop = time.time()
   print(f'total time: {timedelta(seconds=stop - start)}')
 
