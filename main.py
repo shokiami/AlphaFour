@@ -1,4 +1,4 @@
-from game import init_state, get_valid_actions, get_next_state, is_terminal
+from game import ConnectFour
 from ai import AI
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
@@ -15,7 +15,7 @@ def get_events():
       events['q'] = event.key == pygame.K_q
   return events
 
-def render(state, canvas, arrow_x):
+def render(state, canvas, arrow_x=None):
   canvas.fill((255, 255, 255))
   gfxdraw.box(canvas, (0, 100, 700, 700), (255, 235, 0))
   for i in range(6):
@@ -37,39 +37,37 @@ def main():
   pygame.init()
   pygame.display.set_caption('AlphaFour')
   canvas = pygame.display.set_mode((700, 700))
-  state = init_state()
-  player = 1
+  cf = ConnectFour()
+  state = cf.init_state()
   arrow_x = 350
-  ai = AI()
+  ai = AI(cf)
   terminal = False
-  running = True
-  while running:
-    events = get_events()
-    if not terminal:
-      if player == 1:
+  while True:
+    while True:
+      events = get_events()
+      if not terminal:
         action = int(pygame.mouse.get_pos()[0] / 100)
         arrow_x = int(0.2 * (100 * action + 50) + 0.8 * arrow_x)
-        if events['click'] and get_valid_actions(state)[action]:
-          state = get_next_state(state, player, action)
-          terminal, win = is_terminal(state, action)
-          if terminal:
-            print('Red wins!') if win else print('Draw game!')
-          player = -player
-      else:
-        action = ai.compute(state)
-        state = get_next_state(state, player, action)
-        terminal, win = is_terminal(state, action)
-        if terminal:
-          print('Blue wins!') if win else print('Draw game!')
-        player = -player
-    render(state, canvas, arrow_x if player == 1 and not terminal else None)
-    if events['r']:
-      state = init_state()
-      player = 1
-      arrow_x = 350
-      terminal = False
-    if events['quit'] or events['q']:
-      running = False
+        render(state, canvas, arrow_x)
+        if events['click'] and cf.get_valid_actions(state)[action]:
+          break
+      if events['r']:
+        state = cf.init_state()
+        terminal = False
+      if events['quit'] or events['q']:
+        exit()
+    state = cf.get_next_state(state, 1, action)
+    render(state, canvas)
+    terminal, win = cf.is_terminal(state, action)
+    if terminal:
+      print('Red wins!') if win else print('Draw game!')
+      continue
+    action = ai.compute(state)
+    state = cf.get_next_state(state, -1, action)
+    render(state, canvas)
+    terminal, win = cf.is_terminal(state, action)
+    if terminal:
+      print('Blue wins!') if win else print('Draw game!')
 
 if __name__ == '__main__':
   main()
