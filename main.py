@@ -36,11 +36,11 @@ def render(state, canvas, arrow_x=None):
 def main():
   pygame.init()
   pygame.display.set_caption('AlphaFour')
-  canvas = pygame.display.set_mode((700, 700))
   cf = ConnectFour()
-  state = cf.init_state()
-  arrow_x = 350
   ai = AI(cf)
+  state = cf.init_state()
+  canvas = pygame.display.set_mode((700, 700))
+  arrow_x = 350
   terminal = False
   while True:
     while True:
@@ -60,14 +60,14 @@ def main():
     render(state, canvas)
     terminal, win = cf.is_terminal(state, action)
     if terminal:
-      print('Red wins!') if win else print('Draw game!')
+      print('You win!') if win else print('Draw game!')
       continue
     action = ai.compute(state)
     state = cf.get_next_state(state, -1, action)
     render(state, canvas)
     terminal, win = cf.is_terminal(state, action)
     if terminal:
-      print('Blue wins!') if win else print('Draw game!')
+      print('AlphaFour wins!') if win else print('Draw game!')
 
 if __name__ == '__main__':
   main()

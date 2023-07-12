@@ -1,12 +1,9 @@
-from game import ConnectFour
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
 import matplotlib.pyplot as plt
-import time
-from datetime import timedelta
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -221,14 +218,3 @@ class AI:
     policy = self.monte_carlo_tree_search([-state])[0]
     print(policy.round(4))
     return np.argmax(policy)
-
-def main():
-  start = time.time()
-  cf = ConnectFour()
-  ai = AI(cf)
-  ai.learn()
-  stop = time.time()
-  print(f'total time: {timedelta(seconds=stop - start)}')
-
-if __name__ == '__main__':
-  main()
