@@ -15,7 +15,7 @@ MCTS_ITRS = 100
 GAMES_PER_ITR = 100
 EPOCHS_PER_ITR = 10
 BATCH_SIZE = 64
-NUM_ITRS = 1
+NUM_ITRS = 10
 
 class ResBlock(nn.Module):
   def __init__(self, num_channels):
@@ -83,8 +83,9 @@ class MCTSNode:
     return max(self.children, key=lambda child: child.ucb())
 
   def ucb(self):
-    q_val = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
-    return q_val + 2.0 * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
+    exploit = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
+    explore = 2.0 * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
+    return exploit + explore
 
   def expand(self, policy):
     for action, prob in enumerate(policy):
@@ -111,16 +112,6 @@ class AI:
     encoded_states = np.stack((states == 1, states == 0, states == -1)).swapaxes(0, 1)
     return torch.tensor(encoded_states, dtype=torch.float32)
 
-  def predict(self, states):
-    with torch.no_grad():
-      policies, values = self.model(self.to_tensor(states))
-    policies = torch.softmax(policies, 1).numpy()
-    values = values.numpy()
-    for game in range(len(states)):
-      policies[game][~get_valid_actions(states[game])] = 0.0
-      policies[game] /= np.sum(policies[game])
-    return policies, values
-
   def mcts_search(self, states):
     self.model.eval()
     roots = [MCTSNode(state) for state in states]
@@ -136,7 +127,14 @@ class AI:
         else:
           leafs.append(node)
       if len(leafs) > 0:
-        policies, values = self.predict([leaf.state for leaf in leafs])
+        leaf_states = [leaf.state for leaf in leafs]
+        with torch.no_grad():
+          policies, values = self.model(self.to_tensor(leaf_states))
+        policies = torch.softmax(policies, 1).numpy()
+        values = values.numpy()
+        for j in range(len(leafs)):
+          policies[j][~get_valid_actions(leaf_states[j])] = 0.0
+          policies[j] /= np.sum(policies[j])
         for j in range(len(leafs)):
           leafs[j].expand(policies[j])
           leafs[j].backpropagate(values[j])
