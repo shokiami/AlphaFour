@@ -124,7 +124,6 @@ class AI:
     self.model.eval()
     roots = [MCTSNode(self.game, state) for state in states]
     for i in range(MCTS_ITRS):
-      print(i)
       leafs = []
       for root in roots:
         node = root
