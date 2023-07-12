@@ -12,7 +12,7 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 MODEL_PATH = 'model.pt'
-LOSSES_PLOT = 'losses.png'
+LOSS_PLOT = 'loss.png'
 NUM_BLOCKS = 8
 NUM_CHANNELS = 128
 LEARNING_RATE = 0.001
@@ -215,7 +215,7 @@ class AI:
     plt.plot(range(len(losses)), losses)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.savefig(LOSSES_PLOT)
+    plt.savefig(LOSS_PLOT)
 
   def compute(self, state):
     policy = self.monte_carlo_tree_search([-state])[0]
