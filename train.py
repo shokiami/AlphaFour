@@ -68,11 +68,11 @@ def plot(losses):
 
 def main():
   start = time.time()
-  cf = ConnectFour()
-  ai = AlphaFour(cf)
   if os.path.isdir(MODELS):
     shutil.rmtree(MODELS)
   os.makedirs(MODELS)
+  cf = ConnectFour()
+  ai = AlphaFour(cf)
   torch.save(ai.model.state_dict(), os.path.join(MODELS, 'model_0.pt'))
   losses = []
   for i in range(NUM_GENS):
