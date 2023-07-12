@@ -3,21 +3,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
-import matplotlib.pyplot as plt
 
 torch.manual_seed(0)
 np.random.seed(0)
 
-MODEL_PATH = 'model.pt'
-LOSS_PLOT = 'loss.png'
+MODELS = 'models'
 NUM_BLOCKS = 8
 NUM_CHANNELS = 128
 LEARNING_RATE = 0.001
 MCTS_ITRS = 100
-GAMES_PER_ITR = 500
-EPOCHS_PER_ITR = 10
-BATCH_SIZE = 64
-NUM_ITRS = 10
 
 class ResBlock(nn.Module):
   def __init__(self, num_channels):
@@ -94,8 +88,8 @@ class MCTSNode:
   def expand(self, policy):
     for i in range(len(policy)):
       if policy[i] > 0.0:
-        next_state = -self.game.get_next_state(self.state, 1, i)
-        child = MCTSNode(self.game, next_state, self, i, policy[i])
+        child_state = -self.game.next_state(self.state, 1, i)
+        child = MCTSNode(self.game, child_state, self, i, policy[i])
         self.children.append(child)
 
   def backpropagate(self, value):
@@ -104,12 +98,13 @@ class MCTSNode:
     if self.parent is not None:
       self.parent.backpropagate(-value)
 
-class AI:
-  def __init__(self, game):
+class AlphaFour:
+  def __init__(self, game, gen=100):
     self.game = game
     self.model = ResNet(game, NUM_BLOCKS, NUM_CHANNELS)
-    if os.path.isfile(MODEL_PATH):
-      self.model.load_state_dict(torch.load(MODEL_PATH))
+    model_path = os.path.join(MODELS, f'model_{gen}.pt')
+    if os.path.isfile(model_path):
+      self.model.load_state_dict(torch.load(model_path))
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
 
   def to_tensor(self, states):
@@ -138,7 +133,7 @@ class AI:
         policies = torch.softmax(policies, 1).numpy()
         values = values.numpy()
         for j in range(len(leafs)):
-          policies[j][~self.game.get_valid_actions(leaf_states[j])] = 0.0
+          policies[j][~self.game.valid_actions(leaf_states[j])] = 0.0
           policies[j] /= np.sum(policies[j])
           leafs[j].expand(policies[j])
           leafs[j].backpropagate(values[j])
@@ -150,70 +145,7 @@ class AI:
       policy /= np.sum(policy)
       policies.append(policy)
     return policies
-
-  def self_play(self):
-    examples = []
-    player = 1
-    states = [self.game.init_state() for i in range(GAMES_PER_ITR)]
-    curr_examples = [[] for i in range(GAMES_PER_ITR)]
-    move = 0
-    while len(states) > 0:
-      input_states = [player * state for state in states]
-      policies = self.monte_carlo_tree_search(input_states)
-      for i in reversed(range(len(states))):
-        curr_examples[i].append([input_states[i], policies[i], 0.0])
-        action = np.random.choice(self.game.action_size, p=policies[i])
-        states[i] = self.game.get_next_state(states[i], player, action)
-        terminal, win = self.game.is_terminal(states[i], action)
-        if terminal:
-          print(states[i])
-          if win:
-            for j in range(len(curr_examples[i])):
-              curr_examples[i][j][2] = 1.0 if (len(curr_examples[i]) - j) % 2 == 1 else -1.0
-          examples += curr_examples[i]
-          states.pop(i)
-          curr_examples.pop(i)
-      player = -player
-      print(f'move: {move + 1}, remaining: {len(states)}')
-      move += 1
-    return examples
-
-  def train(self, examples):
-    self.model.train()
-    np.random.shuffle(examples)
-    losses = []
-    for i in range(0, len(examples), BATCH_SIZE):
-      states, policies, values = zip(*examples[i: i + BATCH_SIZE])
-      policies = torch.tensor(np.array(policies), dtype=torch.float32)
-      values = torch.tensor(np.array(values), dtype=torch.float32).unsqueeze(1)
-      pred_policies, pred_values = self.model(self.to_tensor(states))
-      loss = F.cross_entropy(pred_policies, policies) + F.mse_loss(pred_values, values)
-      self.optimizer.zero_grad()
-      loss.backward()
-      self.optimizer.step()
-      losses.append(loss.item())
-    return np.mean(losses)
-
-  def learn(self):
-    losses = []
-    for i in range(NUM_ITRS):
-      examples = self.self_play()
-      for epoch in range(EPOCHS_PER_ITR):
-        loss = self.train(examples)
-        losses.append(loss)
-        print(f'epoch: {epoch + 1}/{EPOCHS_PER_ITR}')
-      torch.save(self.model.state_dict(), MODEL_PATH)
-      self.plot(losses)
-      print(f'iteration: {i + 1}/{NUM_ITRS}')
-
-  def plot(self, losses):
-    plt.figure()
-    plt.title('Loss vs. Epoch')
-    plt.plot(range(len(losses)), losses)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.savefig(LOSS_PLOT)
-
+  
   def compute(self, state):
     policy = self.monte_carlo_tree_search([-state])[0]
     print(policy.round(4))

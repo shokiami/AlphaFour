@@ -49,21 +49,21 @@ def main():
         action = int(pygame.mouse.get_pos()[0] / 100)
         arrow_x = int(0.2 * (100 * action + 50) + 0.8 * arrow_x)
         render(state, canvas, arrow_x)
-        if events['click'] and cf.get_valid_actions(state)[action]:
+        if events['click'] and cf.valid_actions(state)[action]:
           break
       if events['r']:
         state = cf.init_state()
         terminal = False
       if events['quit'] or events['q']:
         exit()
-    state = cf.get_next_state(state, 1, action)
+    state = cf.next_state(state, 1, action)
     render(state, canvas)
     terminal, win = cf.is_terminal(state, action)
     if terminal:
       print('You win!') if win else print('Draw game!')
       continue
     action = ai.compute(state)
-    state = cf.get_next_state(state, -1, action)
+    state = cf.next_state(state, -1, action)
     render(state, canvas)
     terminal, win = cf.is_terminal(state, action)
     if terminal:

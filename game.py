@@ -8,10 +8,10 @@ class ConnectFour:
   def init_state(self):
     return np.zeros((6, 7), dtype=np.int8)
 
-  def get_valid_actions(self, state):
+  def valid_actions(self, state):
     return state[0] == 0
 
-  def get_next_state(self, state, player, action):
+  def next_state(self, state, player, action):
     next_state = np.copy(state)
     row = np.max(np.where(next_state[:, action] == 0))
     next_state[row, action] = player
@@ -36,4 +36,4 @@ class ConnectFour:
           j += sgn * dj
       if n >= 4:
         return True, True
-    return np.all(~self.get_valid_actions(state)), False
+    return np.all(~self.valid_actions(state)), False
