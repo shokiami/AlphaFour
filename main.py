@@ -39,7 +39,7 @@ def main():
   canvas = pygame.display.set_mode((700, 700))
   game = ConnectFour()
   state = game.init_state()
-  ai = AlphaFour(game, 14)
+  ai = AlphaFour(game, 20)
   arrow_x = 350
   terminal = False
   while True:

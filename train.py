@@ -13,10 +13,10 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 LOSS_PLOT = 'loss.png'
-GAMES_PER_GEN = 100
+GAMES_PER_GEN = 500
 EPOCHS_PER_GEN = 10
 BATCH_SIZE = 64
-NUM_GENS = 100
+NUM_GENS = 20
 
 def self_play(ai):
   examples = []
