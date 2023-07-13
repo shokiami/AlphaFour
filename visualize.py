@@ -43,6 +43,7 @@ def main():
   os.makedirs(EXAMPLES)
   save_gif( 0, [3, 2, 1, 0], canvas)
   save_gif(10, [3, 1, 3, 2, 4, 2, 5], canvas)
+  save_gif(20, [3, 3, 3, 0, 1, 1, 5, 4, 2], canvas)
 
 if __name__ == '__main__':
   main()

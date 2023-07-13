@@ -9,6 +9,7 @@ NUM_BLOCKS = 8
 NUM_CHANNELS = 128
 LEARNING_RATE = 0.001
 MCTS_ITRS = 100
+C_PUCT = 2.0
 
 class ResBlock(nn.Module):
   def __init__(self, num_channels):
@@ -79,7 +80,7 @@ class MCTSNode:
 
   def upper_confidence_bound(self):
     exploit = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
-    explore = 2.0 * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
+    explore = C_PUCT * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
     return exploit + explore
 
   def expand(self, policy):
