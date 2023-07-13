@@ -10,6 +10,8 @@ NUM_CHANNELS = 128
 LEARNING_RATE = 0.001
 MCTS_ITRS = 100
 C_PUCT = 2.0
+DIRICHLET_EPSILON = 0.3
+DIRICHLET_ALPHA = 0.3
 
 class ResBlock(nn.Module):
   def __init__(self, num_channels):
@@ -110,7 +112,7 @@ class AlphaFour:
     encoded_states = np.stack((states == 1, states == 0, states == -1)).swapaxes(0, 1)
     return torch.tensor(encoded_states, dtype=torch.float32)
 
-  def monte_carlo_tree_search(self, states):
+  def monte_carlo_tree_search(self, states, train=False):
     self.model.eval()
     roots = [MCTSNode(self.game, state) for state in states]
     for i in range(MCTS_ITRS):
@@ -130,6 +132,9 @@ class AlphaFour:
           policies, values = self.model(self.to_tensor(leaf_states))
         policies = torch.softmax(policies, 1).numpy()
         values = values.numpy()
+        if train and i == 0:
+          noise = np.random.dirichlet(self.game.action_size * [DIRICHLET_ALPHA], len(leafs))
+          policies = (1.0 - DIRICHLET_EPSILON) * policies + DIRICHLET_EPSILON * noise
         for j in range(len(leafs)):
           policies[j][~self.game.valid_actions(leaf_states[j])] = 0.0
           policies[j] /= np.sum(policies[j])

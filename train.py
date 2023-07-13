@@ -13,10 +13,10 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 LOSS_PLOT = 'loss.png'
-GAMES_PER_GEN = 500
+GAMES_PER_GEN = 100
 EPOCHS_PER_GEN = 10
-BATCH_SIZE = 32
-NUM_GENS = 20
+BATCH_SIZE = 64
+NUM_GENS = 100
 
 def self_play(ai):
   examples = []
@@ -26,7 +26,7 @@ def self_play(ai):
   move = 0
   while len(states) > 0:
     input_states = [player * state for state in states]
-    policies = ai.monte_carlo_tree_search(input_states)
+    policies = ai.monte_carlo_tree_search(input_states, True)
     for i in reversed(range(len(states))):
       curr_examples[i].append([input_states[i], policies[i], 0.0])
       action = np.random.choice(ai.game.action_size, p=policies[i])
