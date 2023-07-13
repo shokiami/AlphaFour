@@ -74,15 +74,15 @@ class MCTSNode:
     self.prev_action = prev_action
     self.prior = prior
     self.children = []
+    self.value_sum = 0.0
     self.visit_count = 0
-    self.value_sum = 0
 
   def select(self):
-    return max(self.children, key=lambda child: child.upper_confidence_bound())
+    return max(self.children, key=lambda child: child.ucb())
 
-  def upper_confidence_bound(self):
+  def ucb(self):
     exploit = 0.0 if self.visit_count == 0 else 0.5 - 0.5 * self.value_sum / self.visit_count
-    explore = C_PUCT * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1.0)
+    explore = C_PUCT * self.prior * np.sqrt(self.parent.visit_count) / (self.visit_count + 1)
     return exploit + explore
 
   def expand(self, policy):
@@ -92,11 +92,11 @@ class MCTSNode:
         child = MCTSNode(self.game, child_state, self, i, policy[i])
         self.children.append(child)
 
-  def backpropagate(self, value):
+  def backprop(self, value):
     self.value_sum += value
     self.visit_count += 1
     if self.parent is not None:
-      self.parent.backpropagate(-value)
+      self.parent.backprop(-value)
 
 class AlphaFour:
   def __init__(self, game, gen):
@@ -112,7 +112,11 @@ class AlphaFour:
     encoded_states = np.stack((states == 1, states == 0, states == -1)).swapaxes(0, 1)
     return torch.tensor(encoded_states, dtype=torch.float32)
 
-  def monte_carlo_tree_search(self, states, train=False):
+  def mcts(self, state):
+    policies, values = self.mcts_parallel([state], False)
+    return policies[0], values[0]
+
+  def mcts_parallel(self, states, train=True):
     self.model.eval()
     roots = [MCTSNode(self.game, state) for state in states]
     for i in range(MCTS_ITRS):
@@ -123,7 +127,7 @@ class AlphaFour:
           node = node.select()
         terminal, win = self.game.is_terminal(node.state, node.prev_action)
         if terminal:
-          node.backpropagate(-1.0) if win else node.backpropagate(0.0)
+          node.backprop(-1.0) if win else node.backprop(0.0)
         else:
           leafs.append(node)
       if len(leafs) > 0:
@@ -131,7 +135,7 @@ class AlphaFour:
         with torch.no_grad():
           policies, values = self.model(self.to_tensor(leaf_states))
         policies = torch.softmax(policies, 1).numpy()
-        values = values.numpy()
+        values = values.squeeze(1).numpy()
         if train and i == 0:
           noise = np.random.dirichlet(self.game.action_size * [DIRICHLET_ALPHA], len(leafs))
           policies = (1.0 - DIRICHLET_EPSILON) * policies + DIRICHLET_EPSILON * noise
@@ -139,17 +143,20 @@ class AlphaFour:
           policies[j][~self.game.valid_actions(leaf_states[j])] = 0.0
           policies[j] /= np.sum(policies[j])
           leafs[j].expand(policies[j])
-          leafs[j].backpropagate(values[j])
+          leafs[j].backprop(values[j])
     policies = []
+    values = []
     for root in roots:
       policy = np.zeros(self.game.action_size)
       for child in root.children:
         policy[child.prev_action] = child.visit_count
       policy /= np.sum(policy)
       policies.append(policy)
-    return policies
+      values.append(root.value_sum / root.visit_count)
+    return policies, values
   
-  def compute(self, state):
-    policy = self.monte_carlo_tree_search([-state])[0]
-    print(policy.round(4))
+  def compute_action(self, state):
+    policy, value = self.mcts(-state)
+    print(f'policy: {policy.round(2)}')
+    print(f'value: {value.round(4)}')
     return np.argmax(policy)

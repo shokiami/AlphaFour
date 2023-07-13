@@ -26,7 +26,7 @@ def save_gif(gen, actions, canvas):
     terminal, win = game.is_terminal(state, action)
     if terminal:
       break
-    action = ai.compute(state)
+    action = ai.compute_action(state)
     state = game.next_state(state, -1, action)
     images.append(to_image(state, canvas))
     terminal, win = game.is_terminal(state, action)

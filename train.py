@@ -26,7 +26,7 @@ def self_play(ai):
   move = 0
   while len(states) > 0:
     input_states = [player * state for state in states]
-    policies = ai.monte_carlo_tree_search(input_states, True)
+    policies, values = ai.mcts_parallel(input_states, True)
     for i in reversed(range(len(states))):
       curr_examples[i].append([input_states[i], policies[i], 0.0])
       action = np.random.choice(ai.game.action_size, p=policies[i])

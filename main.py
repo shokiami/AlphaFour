@@ -62,7 +62,7 @@ def main():
     if terminal:
       print('You win!') if win else print('Draw game!')
       continue
-    action = ai.compute(state)
+    action = ai.compute_action(state)
     state = game.next_state(state, -1, action)
     render(state, canvas)
     terminal, win = game.is_terminal(state, action)
