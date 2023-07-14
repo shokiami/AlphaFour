@@ -10,8 +10,8 @@ NUM_CHANNELS = 128
 LEARNING_RATE = 0.001
 MCTS_ITRS = 100
 C_PUCT = 2.0
-DIRICHLET_EPSILON = 0.3
-DIRICHLET_ALPHA = 0.3
+DIRICHLET_EPSILON = 0.1
+DIRICHLET_ALPHA = 1.4
 
 class ResBlock(nn.Module):
   def __init__(self, num_channels):
