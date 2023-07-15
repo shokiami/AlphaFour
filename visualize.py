@@ -14,7 +14,7 @@ def to_image(state, canvas):
   render(state, canvas)
   return Image.fromarray(np.array(pygame.surfarray.pixels3d(canvas)).swapaxes(0, 1)[100:700])
 
-def save_gif(gen, actions, canvas):
+def save_gif(filename, gen, actions, canvas):
   game = ConnectFour()
   state = game.init_state()
   ai = AlphaFour(game, gen)
@@ -33,7 +33,7 @@ def save_gif(gen, actions, canvas):
     if terminal:
       break
   images.insert(0, images.pop())
-  images[0].save(os.path.join(EXAMPLES, f'{gen}.gif'), format='GIF', append_images=images, save_all=True, duration=400, loop=0)
+  images[0].save(os.path.join(EXAMPLES, filename), format='GIF', append_images=images, save_all=True, duration=400, loop=0)
 
 def main():
   pygame.init()
@@ -41,10 +41,11 @@ def main():
   if os.path.isdir(EXAMPLES):
     shutil.rmtree(EXAMPLES)
   os.makedirs(EXAMPLES)
-  save_gif( 0, [3, 2, 1, 0], canvas)
-  save_gif( 5, [3, 3, 3, 4, 2, 5, 6, 4, 1], canvas)
-  save_gif(10, [3, 3, 3, 4, 4, 1, 1, 3, 5, 2, 5, 2, 0, 0, 2, 2], canvas)
-  save_gif(20, [3, 3, 3, 5, 2, 2, 5, 5, 4, 0, 2, 4, 1, 1, 0, 0, 6, 6, 4], canvas)
+  save_gif('0_vs_opt.gif', 0, [3, 2, 1, 0], canvas)
+  save_gif('5_vs_opt.gif', 5, [3, 3, 3, 4, 2, 5, 6, 4, 1], canvas)
+  save_gif('10_vs_opt.gif', 10, [3, 3, 3, 4, 4, 1, 1, 3, 5, 2, 5, 2, 0, 0, 2, 2], canvas)
+  save_gif('20_vs_opt.gif', 20, [3, 3, 3, 5, 2, 2, 5, 5, 4, 0, 2, 4, 1, 1, 0, 0, 6, 6, 4], canvas)
+  save_gif('20_vs_subopt.gif', 20, [3, 3, 1, 2, 4, 3, 0, 2, 5, 6, 5, 5, 0, 0, 0, 6, 6, 4, 4, 1], canvas)
 
 if __name__ == '__main__':
   main()
