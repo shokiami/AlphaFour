@@ -13,16 +13,16 @@ python3 main.py
 ```
 
 Results (~9 hours of training): <br>
-![](loss.png)
+<img src="loss.png" width="500px"/>
 
 Generation 0: <br>
-![](examples/0.gif)
+<img src="examples/0.gif" width="500px"/>
 
 Generation 5: <br>
-![](examples/5.gif)
+<img src="examples/5.gif" width="500px"/>
 
 Generation 10: <br>
-![](examples/10.gif)
+<img src="examples/10.gif" width="500px"/>
 
 Generation 20: <br>
-![](examples/20.gif)
+<img src="examples/20.gif" width="500px"/>
