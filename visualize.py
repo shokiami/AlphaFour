@@ -42,8 +42,9 @@ def main():
     shutil.rmtree(EXAMPLES)
   os.makedirs(EXAMPLES)
   save_gif( 0, [3, 2, 1, 0], canvas)
-  save_gif(10, [3, 1, 3, 2, 4, 2, 5], canvas)
-  save_gif(20, [3, 3, 3, 0, 1, 1, 5, 4, 2], canvas)
+  save_gif( 5, [3, 3, 3, 4, 2, 5, 6, 4, 1], canvas)
+  save_gif(10, [3, 3, 3, 4, 4, 1, 1, 3, 5, 2, 5, 2, 0, 0, 2, 2], canvas)
+  save_gif(20, [3, 3, 3, 5, 2, 2, 5, 5, 4, 0, 2, 4, 1, 1, 0, 0, 6, 6, 4], canvas)
 
 if __name__ == '__main__':
   main()
