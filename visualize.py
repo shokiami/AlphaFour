@@ -12,7 +12,7 @@ EXAMPLES = 'examples'
 
 def to_image(state, canvas):
   render(state, canvas)
-  return Image.fromarray(np.array(pygame.surfarray.pixels3d(canvas)).swapaxes(0, 1))
+  return Image.fromarray(np.array(pygame.surfarray.pixels3d(canvas)).swapaxes(0, 1)[100:700])
 
 def save_gif(gen, actions, canvas):
   game = ConnectFour()
